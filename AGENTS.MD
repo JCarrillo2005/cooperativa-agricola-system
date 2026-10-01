@@ -1,6 +1,6 @@
 # AGENTS.MD — Sistema Cooperativa Agrícola "Tiendita"
 
-> **Documento de contexto técnico** para desarrolladores y agentes de IA.
+> **Documento de contexto técnico y arquitectura** para desarrolladores y agentes de IA.
 > Última actualización: 2026-10-01
 
 ---
@@ -12,12 +12,12 @@
 | **Nombre**                   | Sistema Cooperativa Agrícola "Tiendita" |
 | **Tipo**                     | Aplicación de escritorio Java SE        |
 | **IDE**                      | Apache NetBeans 31                      |
-| **Lenguaje**                 | Java SE (source/target 26)              |
+| **Lenguaje**                 | Java SE (source/target 1.8 / 11)        |
 | **Base de datos principal**  | Oracle Database 10g (XE)                |
 | **Base de datos secundaria** | PostgreSQL                              |
 | **Arquitectura**             | MVC / DAO (Data Access Object)          |
 | **Build system**             | Apache Ant                              |
-| **Patrón de UI**             | Java Swing (JFrames)                    |
+| **Patrón de UI**             | Java Swing (JFrames / GUI Builder)      |
 
 ### Propósito
 
@@ -110,9 +110,9 @@ SistemaCooperativaAgricola/
 ### 4.1 Propiedades de Compilación (`nbproject/project.properties`)
 
 ```properties
-# Versión de Java
-javac.source=26
-javac.target=26
+# Versión de Java (compatible con ojdbc14.jar)
+javac.source=1.8
+javac.target=1.8
 source.encoding=UTF-8
 
 # Clase principal
@@ -123,9 +123,9 @@ javac.classpath=\
     ${file.reference.ojdbc14.jar}:\
     ${file.reference.postgresql-42.7.13.jar}
 
-# Referencias a JARs
-file.reference.ojdbc14.jar=C:\\oraclexe\\app\\oracle\\product\\10.2.0\\server\\jdbc\\lib\\ojdbc14.jar
-file.reference.postgresql-42.7.13.jar=C:\\Users\\Julio Cesar\\Downloads\\postgresql-42.7.13.jar
+# Referencias a JARs (rutas relativas dentro del proyecto)
+file.reference.ojdbc14.jar=lib/ojdbc14.jar
+file.reference.postgresql-42.7.13.jar=lib/postgresql-42.7.13.jar
 
 # Directorios
 build.dir=build
@@ -135,6 +135,35 @@ src.dir=src
 test.src.dir=test
 ```
 
+#### ⚠️ Por qué `javac.source=1.8` y no una versión superior
+
+El driver **`ojdbc14.jar` es legado** (diseñado originalmente para Java 1.4/5). Compilar con
+Java 26 rompería la ejecución por cambios profundos en la JVM, `reflection` y el manejo de TLS.
+
+| Versión de Java  | ¿Compatible con `ojdbc14.jar`?    |
+| ---------------- | --------------------------------- |
+| **Java 8 (1.8)** | ✅ Recomendada para este proyecto |
+| **Java 11**      | ✅ Alternativa válida             |
+| Java 17+         | ⚠️ Riesgo de incompatibilidad     |
+| Java 26          | ❌ No usar                        |
+
+**Regla:** no subir `javac.source` / `javac.target` por encima de 1.8 sin, antes,
+migrar a un driver Oracle moderno (`ojdbc8.jar` / `ojdbc11.jar` o superior).
+
+#### ⚠️ Por qué las rutas de los JAR son relativas
+
+Las referencias apuntan a `lib/` dentro del proyecto y **no** a rutas absolutas del
+dispositivo de un solo desarrollador.
+
+Rutas absolutas del tipo `C:\Users\Julio Cesar\Downloads\...` rompen la compilación
+en NetBeans para cualquier otro miembro del equipo
+tras clonar el repositorio, porque esas carpetas no existen en sus máquinas.
+
+Si algún JAR cambia de nombre o versión, actualizar **las dos cosas**:
+
+1. El archivo dentro de `lib/`
+2. Las líneas `file.reference.*` de `nbproject/project.properties`
+
 ### 4.2 Conexión a Base de Datos
 
 #### Oracle 10g (Principal)
@@ -142,8 +171,8 @@ test.src.dir=test
 | Parámetro  | Valor                                 |
 | ---------- | ------------------------------------- |
 | URL        | `jdbc:oracle:thin:@localhost:1521:XE` |
-| Usuario    | `system`                              |
-| Contraseña | `julio123`                            |
+| Usuario    | `USUARIO`                             |
+| Contraseña | `CONTRASEÑA`                          |
 | Driver     | `oracle.jdbc.driver.OracleDriver`     |
 
 #### PostgreSQL (Secundaria)
@@ -159,22 +188,22 @@ test.src.dir=test
 
 ### 5.1 Librerías JAR
 
-| JAR                      | Ubicación                                  | Descripción            |
-| ------------------------ | ------------------------------------------ | ---------------------- |
-| `ojdbc14.jar`            | `lib/` y `C:\oraclexe\...`                 | Driver JDBC Oracle 10g |
-| `postgresql-42.7.13.jar` | `lib/` y `C:\Users\Julio Cesar\Downloads\` | Driver JDBC PostgreSQL |
+| JAR                      | Ubicación | Descripción            |
+| ------------------------ | --------- | ---------------------- |
+| `ojdbc14.jar`            | `lib/`    | Driver JDBC Oracle 10g |
+| `postgresql-42.7.13.jar` | `lib/`    | Driver JDBC PostgreSQL |
 
 ### 5.2 Tecnologías Utilizadas
 
-| Tecnología      | Versión          | Uso                       |
-| --------------- | ---------------- | ------------------------- |
-| Java SE         | 26               | Lenguaje principal        |
-| Apache NetBeans | 31               | IDE de desarrollo         |
-| Oracle Database | 10g (10.2.0.1.0) | Base de datos principal   |
-| PostgreSQL      | -                | Base de datos secundaria  |
-| JDBC            | -                | Conexión a bases de datos |
-| Apache Ant      | -                | Sistema de build          |
-| Java Swing      | -                | Framework de UI           |
+| Tecnología      | Versión          | Uso                                             |
+| --------------- | ---------------- | ----------------------------------------------- |
+| Java SE         | 1.8 / 11         | Lenguaje principal (compatible con ojdbc14.jar) |
+| Apache NetBeans | 31               | IDE de desarrollo                               |
+| Oracle Database | 10g (10.2.0.1.0) | Base de datos principal                         |
+| PostgreSQL      | -                | Base de datos secundaria                        |
+| JDBC            | -                | Conexión a bases de datos                       |
+| Apache Ant      | -                | Sistema de build                                |
+| Java Swing      | -                | Framework de UI                                 |
 
 ---
 
@@ -195,7 +224,7 @@ test.src.dir=test
 public class ConexionOracle {
     private static final String URL = "jdbc:oracle:thin:@localhost:1521:XE";
     private static final String USER = "system";
-    private static final String PASSWORD = "julio123";
+    private static final String PASSWORD = "password";
     private static Connection conexion = null;
 
     public static Connection getConexion() {
@@ -385,7 +414,7 @@ ant jar
 
 - Configuración de compilación
 - Definición de la clase principal
-- Referencias a JARs de dependencias
+- Referencias a JARs de dependencias (rutas relativas)
 
 ### 10.2 `nbproject/project.xml`
 
@@ -421,7 +450,7 @@ nbproject/private/
 - [x] Clase `Main.java` (punto de entrada)
 - [x] Clase `ConexionOracle.java` (conexión JDBC)
 - [x] Configuración del proyecto NetBeans
-- [x] Dependencias JAR configuradas
+- [x] Dependencias JAR configuradas (rutas relativas)
 - [x] README.md con documentación básica
 
 ### 11.2 Pendiente
@@ -493,9 +522,12 @@ nbproject/private/
 
 ## 15. Historial de Cambios
 
-| Fecha      | Cambio                                   | Autor     |
-| ---------- | ---------------------------------------- | --------- |
-| 2026-10-01 | Creación inicial del documento AGENTS.MD | Agente IA |
+| Fecha      | Cambio                                                                      | Autor     |
+| ---------- | --------------------------------------------------------------------------- | --------- |
+| 2026-10-01 | Creación inicial del documento AGENTS.MD                                    | Agente IA |
+| 2026-10-01 | Añadida sección 0 (Alcance) para dejar claro que es Java SE, no C#/.NET/WPF | Agente IA |
+| 2026-10-01 | Fijado `javac.source/target=1.8` por compatibilidad con `ojdbc14.jar`       | Agente IA |
+| 2026-10-01 | Sustituidas rutas absolutas de JAR por rutas relativas a `lib/`             | Agente IA |
 
 ---
 
