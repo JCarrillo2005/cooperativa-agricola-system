@@ -1,42 +1,79 @@
 package com.cooperativa.config;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Properties;
 
+/**
+ * Fabrica de conexiones JDBC hacia Oracle 10g.
+ *
+ * - Las credenciales NO viven en el codigo: se leen de config.properties
+ *   (en la raiz del proyecto, ignorado por Git).
+ * - Cada llamada a getConexion() devuelve una conexion NUEVA. Asi cada DAO
+ *   puede cerrarla con try-with-resources y las transacciones
+ *   (setAutoCommit(false), commit, rollback) no se mezclan entre si.
+ */
 public class ConexionOracle {
-    
-    // Cambia 'XE' por tu SID de Oracle 10g si es distinto (ejemplo: ORCL)
-    private static final String URL = "jdbc:oracle:thin:@localhost:1521:XE"; 
-    private static final String USER = "system"; // Tu usuario de Oracle
-    private static final String PASSWORD = "password"; // Tu contraseña de Oracle
-    
-    private static Connection conexion = null;
 
-    public static Connection getConexion() {
+    private static final String ARCHIVO_CONFIG = "config.properties";
+    private static final String DRIVER = "oracle.jdbc.driver.OracleDriver"; // ojdbc14.jar
+
+    private static String url;
+    private static String usuario;
+    private static String password;
+
+    static {
         try {
-            if (conexion == null || conexion.isClosed()) {
-                Class.forName("oracle.jdbc.driver.OracleDriver");
-                conexion = DriverManager.getConnection(URL, USER, PASSWORD);
-                System.out.println("✅ Conexión exitosa a Oracle Database 10g");
-            }
+            cargarConfiguracion();
+            Class.forName(DRIVER);
+        } catch (IOException e) {
+            throw new ExceptionInInitializerError(
+                "No se pudo leer " + ARCHIVO_CONFIG + ". Copia config.properties.example "
+                + "como config.properties en la raiz del proyecto y ajusta tus datos. ("
+                + e.getMessage() + ")");
         } catch (ClassNotFoundException e) {
-            System.err.println("❌ Error: No se encontró el driver ojdbc14.jar");
-            e.printStackTrace();
-        } catch (SQLException e) {
-            System.err.println("❌ Error de conexión a Oracle 10g: " + e.getMessage());
+            throw new ExceptionInInitializerError(
+                "No se encontro el driver de Oracle. Revisa que lib/ojdbc14.jar este en el classpath.");
         }
-        return conexion;
     }
 
-    public static void cerrarConexion() {
-        if (conexion != null) {
-            try {
-                conexion.close();
-                System.out.println("🔒 Conexión cerrada.");
-            } catch (SQLException e) {
-                System.err.println("Error al cerrar conexión: " + e.getMessage());
-            }
+    private ConexionOracle() {
+        // Clase utilitaria: no se instancia
+    }
+
+    private static void cargarConfiguracion() throws IOException {
+        Properties props = new Properties();
+        try (FileInputStream in = new FileInputStream(ARCHIVO_CONFIG)) {
+            props.load(in);
+        }
+        url = props.getProperty("db.url");
+        usuario = props.getProperty("db.user");
+        password = props.getProperty("db.password");
+
+        if (url == null || usuario == null || password == null) {
+            throw new IOException("Faltan db.url, db.user o db.password en " + ARCHIVO_CONFIG);
+        }
+    }
+
+    /**
+     * Abre una conexion nueva. Quien la pida es responsable de cerrarla:
+     *
+     * try (Connection conn = ConexionOracle.getConexion()) { ... }
+     */
+    public static Connection getConexion() throws SQLException {
+        return DriverManager.getConnection(url, usuario, password);
+    }
+
+    /** Utilidad rapida para verificar que la conexion funciona. */
+    public static boolean probarConexion() {
+        try (Connection conn = getConexion()) {
+            return conn != null && !conn.isClosed();
+        } catch (SQLException e) {
+            System.err.println("Error de conexion: " + e.getMessage());
+            return false;
         }
     }
 }

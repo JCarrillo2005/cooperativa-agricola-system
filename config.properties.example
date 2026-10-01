@@ -1,0 +1,6 @@
+# Copia este archivo como config.properties (en la raiz del proyecto)
+# y pon tus datos. config.properties NO se sube a Git.
+
+db.url=jdbc:oracle:thin:@localhost:1521:XE
+db.user=TU_USUARIO
+db.password=TU_CONTRASENA
