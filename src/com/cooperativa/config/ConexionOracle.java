@@ -9,7 +9,7 @@ public class ConexionOracle {
     // Cambia 'XE' por tu SID de Oracle 10g si es distinto (ejemplo: ORCL)
     private static final String URL = "jdbc:oracle:thin:@localhost:1521:XE"; 
     private static final String USER = "system"; // Tu usuario de Oracle
-    private static final String PASSWORD = "julio123"; // Tu contraseña de Oracle
+    private static final String PASSWORD = "password"; // Tu contraseña de Oracle
     
     private static Connection conexion = null;
 
