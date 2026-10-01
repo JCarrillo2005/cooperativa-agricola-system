@@ -1,4 +1,4 @@
-# AGENTS.MD — Sistema Cooperativa Agrícola "Tiendita"
+# AGENTS.MD — Sistema Cooperativa Agrícola
 
 > **Documento de contexto técnico y arquitectura** para desarrolladores y agentes de IA.
 > Última actualización: 2026-10-01
