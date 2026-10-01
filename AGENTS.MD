@@ -1,34 +1,64 @@
-# AGENTS.MD — Sistema Cooperativa Agrícola
+# AGENTS.MD — Sistema de Gestión Integral · Cooperativa Agrícola
 
 > **Documento de contexto técnico y arquitectura** para desarrolladores y agentes de IA.
 > Última actualización: 2026-10-01
 
 ---
 
+## 0. Alcance
+
+- Proyecto **académico en equipo**.
+- Es una **aplicación de escritorio Java SE** (Swing). **No** es web, ni C#/.NET/WPF, ni Spring.
+- Todo el código, comentarios, nombres de tablas y mensajes de interfaz van **en español**.
+
+---
+
 ## 1. Descripción General del Proyecto
 
-| Campo                        | Valor                                   |
-| ---------------------------- | --------------------------------------- |
-| **Nombre**                   | Sistema Cooperativa Agrícola "Tiendita" |
-| **Tipo**                     | Aplicación de escritorio Java SE        |
-| **IDE**                      | Apache NetBeans 31                      |
-| **Lenguaje**                 | Java SE (source/target 1.8 / 11)        |
-| **Base de datos principal**  | Oracle Database 10g (XE)                |
-| **Base de datos secundaria** | PostgreSQL                              |
-| **Arquitectura**             | MVC / DAO (Data Access Object)          |
-| **Build system**             | Apache Ant                              |
-| **Patrón de UI**             | Java Swing (JFrames / GUI Builder)      |
+| Campo                        | Valor                                              |
+| ---------------------------- | -------------------------------------------------- |
+| **Nombre**                   | Sistema de Gestión Integral - Cooperativa Agrícola |
+| **Tipo**                     | Aplicación de escritorio Java SE                   |
+| **IDE**                      | Apache NetBeans 31                                 |
+| **Lenguaje**                 | Java SE (source/target 1.8)                        |
+| **Base de datos principal**  | Oracle Database 10g (XE)                           |
+| **Base de datos secundaria** | PostgreSQL (migración y Hot Backup)                |
+| **Arquitectura**             | MVC / DAO                                          |
+| **Build system**             | Apache Ant                                         |
+| **UI**                       | Java Swing (JFrames / GUI Builder)                 |
+| **Control de versiones**     | Git + GitHub                                       |
 
-### Propósito
+### 1.1 Contexto del negocio
 
-Sistema de gestión para una cooperativa agrícola que administra:
+Cooperativa dedicada a dar soluciones a **pequeños agricultores** en el proceso de producción
+de productos relacionados con la agricultura. Puede tener **varias sedes** en el país.
 
-- **Personas** (cooperativistas, clientes)
-- **Cuentas** (ahorros)
-- **Préstamos**
-- **Productos** (semillas, abonos, insecticidas)
-- **Hortalizas**
-- **Albaranes** (documentos de entrega)
+Funciones principales:
+
+1. **Créditos (préstamos):** en efectivo, hipotecarios o de **consumo de productos**
+   (semillas, abonos, insecticidas, etc.). En los de consumo se registra el detalle de
+   los productos entregados.
+2. **Cuentas de ahorro:** de ahorro o monetarias. Una cuenta puede pertenecer a
+   **varias personas**, y se lleva un registro de saldos.
+3. **Recepción de productos de los socios:** los socios entregan hortalizas, verduras, etc.
+   mediante **envíos o talonarios de entrega**. Los productos pasan por **control de calidad**
+   y, si cumplen, se pagan a un **mejor precio que el de mercado**.
+4. **Albarán:** documento que se genera después de la entrega y describe el producto
+   **procesado (aceptado)** y el **rechazado**.
+
+### 1.2 Equipo
+
+| Integrante                      | Rol                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| **Julio César Carrillo García** | Coordinador y desarrollador backend Java (model, dao, controller, utils) |
+| **José Adrián**                 | Modelado y administración de BD (Oracle / PostgreSQL)                    |
+| **Jorge Leonidas**              | Desarrollador frontend Java (Swing / GUI)                                |
+| **Nahomi López**                | Documentadora líder y pruebas                                            |
+| **Marvin Muñoz**                | Documentador y diseñador (resumen ejecutivo / infografía)                |
+
+**Regla de trabajo:** el backend define el modelo y los contratos (clases `model`, firmas de
+los DAO); la BD y la interfaz se adaptan a ellos. Cualquier cambio de nombres o tipos en
+`model` debe avisarse al equipo.
 
 ---
 
@@ -38,96 +68,72 @@ Sistema de gestión para una cooperativa agrícola que administra:
 SistemaCooperativaAgricola/
 ├── src/
 │   └── com/cooperativa/
-│       ├── config/          # Configuración de conexión a BD
+│       ├── config/          # Conexión a BD
 │       │   └── ConexionOracle.java
-│       ├── dao/             # Data Access Objects (CRUD) — POR IMPLEMENTAR
-│       ├── main/            # Punto de entrada
-│       │   └── Main.java
-│       ├── model/           # Entidades POJO — POR IMPLEMENTAR
-│       ├── utils/           # Utilidades (PDF, backup) — POR IMPLEMENTAR
-│       └── view/            # Interfaces gráficas Swing — POR IMPLEMENTAR
-├── lib/                     # Dependencias JAR
-│   ├── ojdbc14.jar          # Driver JDBC Oracle
-│   └── postgresql-42.7.13.jar  # Driver JDBC PostgreSQL
-├── nbproject/               # Configuración NetBeans
-│   ├── project.xml          # Definición del proyecto
-│   ├── project.properties   # Propiedades de compilación
-│   ├── build-impl.xml       # Implementación de build
-│   └── private/             # Configuración privada (ignorada por Git)
-├── build/                   # Directorio de compilación (ignorado)
-├── build.xml                # Script Ant para build
-├── manifest.mf              # Manifest del JAR
-├── README.md                # Documentación general
-└── AGENTS.MD                # Este archivo
+│       ├── model/           # Entidades POJO
+│       ├── dao/             # Data Access Objects (CRUD y transacciones SQL)
+│       ├── controller/      # Lógica de negocio / servicios (valida y coordina DAOs)
+│       ├── utils/           # Reportes PDF (albaranes) y Hot Backup
+│       ├── view/            # Interfaces Swing (JFrames / JDialogs)
+│       └── main/
+│           └── Main.java    # Punto de entrada
+├── lib/
+│   ├── ojdbc14.jar
+│   └── postgresql-42.7.13.jar
+├── scripts/                 # DDL/DML para Oracle 10g y PostgreSQL
+├── nbproject/               # Configuración NetBeans (private/ se ignora)
+├── build.xml
+├── manifest.mf
+├── config.properties.example  # Plantilla de credenciales (SÍ se sube a Git)
+├── config.properties          # Credenciales reales (NO se sube a Git)
+├── README.md
+└── AGENTS.MD
 ```
 
 ---
 
 ## 3. Arquitectura del Sistema
 
-### 3.1 Patrón MVC / DAO
+### 3.1 Flujo MVC / DAO
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    VIEW (Swing)                      │
-│              JFrames / JDialogs                      │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│                   CONTROLLER                         │
-│         (Lógica de negocio / Servicios)              │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│                     DAO                              │
-│         (Data Access Objects - CRUD)                 │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│                   DATABASE                            │
-│         Oracle 10g / PostgreSQL                      │
-└─────────────────────────────────────────────────────┘
+VIEW (Swing)  →  CONTROLLER (lógica de negocio)  →  DAO (SQL / JDBC)  →  Oracle 10g / PostgreSQL
+                                   ↑
+                           MODEL (POJOs) viaja entre todas las capas
 ```
 
-### 3.2 Capas del Sistema
+- La **vista** nunca habla con un DAO ni escribe SQL.
+- El **controller** valida reglas (saldo suficiente, estatus activo, stock) y decide
+  qué DAOs se llaman y dentro de qué transacción.
+- El **DAO** solo traduce entre objetos `model` y SQL.
 
-| Capa       | Paquete                  | Responsabilidad                                      | Estado             |
-| ---------- | ------------------------ | ---------------------------------------------------- | ------------------ |
-| **Config** | `com.cooperativa.config` | Conexión a base de datos                             | ✅ Implementada    |
-| **Model**  | `com.cooperativa.model`  | Entidades POJO (Persona, Cuenta, Prestamo, Producto) | ❌ Por implementar |
-| **DAO**    | `com.cooperativa.dao`    | Operaciones CRUD y transacciones SQL                 | ❌ Por implementar |
-| **View**   | `com.cooperativa.view`   | Interfaces gráficas (JFrames)                        | ❌ Por implementar |
-| **Utils**  | `com.cooperativa.utils`  | Reportes PDF, Hot Backup                             | ❌ Por implementar |
-| **Main**   | `com.cooperativa.main`   | Punto de entrada de la aplicación                    | ✅ Implementada    |
+### 3.2 Estado por capa
+
+| Capa           | Paquete                      | Responsabilidad              | Estado             |
+| -------------- | ---------------------------- | ---------------------------- | ------------------ |
+| **Config**     | `com.cooperativa.config`     | Fábrica de conexiones JDBC   | ✅ Implementada    |
+| **Model**      | `com.cooperativa.model`      | 15 entidades POJO            | 🔄 En progreso     |
+| **DAO**        | `com.cooperativa.dao`        | CRUD y transacciones         | ❌ Por implementar |
+| **Controller** | `com.cooperativa.controller` | Reglas de negocio            | ❌ Por implementar |
+| **View**       | `com.cooperativa.view`       | Pantallas Swing              | ❌ Por implementar |
+| **Utils**      | `com.cooperativa.utils`      | PDF de albaranes, Hot Backup | ❌ Por implementar |
+| **Main**       | `com.cooperativa.main`       | Entrada y prueba de conexión | ✅ Implementada    |
 
 ---
 
 ## 4. Configuración del Proyecto
 
-### 4.1 Propiedades de Compilación (`nbproject/project.properties`)
+### 4.1 `nbproject/project.properties`
 
 ```properties
-# Versión de Java (compatible con ojdbc14.jar)
 javac.source=1.8
 javac.target=1.8
 source.encoding=UTF-8
-
-# Clase principal
 main.class=com.cooperativa.main.Main
 
-# Dependencias (classpath)
-javac.classpath=\
-    ${file.reference.ojdbc14.jar}:\
-    ${file.reference.postgresql-42.7.13.jar}
-
-# Referencias a JARs (rutas relativas dentro del proyecto)
 file.reference.ojdbc14.jar=lib/ojdbc14.jar
 file.reference.postgresql-42.7.13.jar=lib/postgresql-42.7.13.jar
 
-# Directorios
 build.dir=build
 dist.dir=dist
 dist.jar=${dist.dir}/SistemaCooperativaAgricola.jar
@@ -135,309 +141,296 @@ src.dir=src
 test.src.dir=test
 ```
 
-#### ⚠️ Por qué `javac.source=1.8` y no una versión superior
+### 4.2 Reglas importantes
 
-El driver **`ojdbc14.jar` es legado** (diseñado originalmente para Java 1.4/5). Compilar con
-Java 26 rompería la ejecución por cambios profundos en la JVM, `reflection` y el manejo de TLS.
+**Versión de Java.** `ojdbc14.jar` es un driver legado (Java 1.4/5). No subir
+`javac.source` / `javac.target` por encima de 1.8 sin migrar antes a un driver
+moderno (`ojdbc8` / `ojdbc11`).
 
-| Versión de Java  | ¿Compatible con `ojdbc14.jar`?    |
-| ---------------- | --------------------------------- |
-| **Java 8 (1.8)** | ✅ Recomendada para este proyecto |
-| **Java 11**      | ✅ Alternativa válida             |
-| Java 17+         | ⚠️ Riesgo de incompatibilidad     |
-| Java 26          | ❌ No usar                        |
+| Versión de Java | ¿Compatible con `ojdbc14.jar`? |
+| --------------- | ------------------------------ |
+| **Java 8**      | ✅ Recomendada                 |
+| **Java 11**     | ✅ Alternativa válida          |
+| Java 17+        | ⚠️ Riesgo de incompatibilidad  |
 
-**Regla:** no subir `javac.source` / `javac.target` por encima de 1.8 sin, antes,
-migrar a un driver Oracle moderno (`ojdbc8.jar` / `ojdbc11.jar` o superior).
+**Sintaxis permitida:** código compatible con Java 8. **No usar** `var`, `record`,
+text blocks (`"""`), `List.of()` ni la API `java.time` con JDBC (el driver no la soporta).
 
-#### ⚠️ Por qué las rutas de los JAR son relativas
+**Rutas relativas.** Los JAR se referencian desde `lib/`. Nunca rutas absolutas
+(`C:\Users\...`), porque rompen la compilación al clonar el repo. Si un JAR cambia de
+nombre o versión, actualizar el archivo en `lib/` **y** las líneas `file.reference.*`.
 
-Las referencias apuntan a `lib/` dentro del proyecto y **no** a rutas absolutas del
-dispositivo de un solo desarrollador.
+### 4.3 Credenciales de BD (`config.properties`)
 
-Rutas absolutas del tipo `C:\Users\Julio Cesar\Downloads\...` rompen la compilación
-en NetBeans para cualquier otro miembro del equipo
-tras clonar el repositorio, porque esas carpetas no existen en sus máquinas.
+Las credenciales **no** están en el código. Cada integrante crea en la raíz del proyecto su
+propio `config.properties` a partir de `config.properties.example`:
 
-Si algún JAR cambia de nombre o versión, actualizar **las dos cosas**:
+```properties
+db.url=jdbc:oracle:thin:@localhost:1521:XE
+db.user=TU_USUARIO
+db.password=TU_CONTRASENA
+```
 
-1. El archivo dentro de `lib/`
-2. Las líneas `file.reference.*` de `nbproject/project.properties`
+`config.properties` está en `.gitignore`. **Nunca** commitear credenciales.
 
-### 4.2 Conexión a Base de Datos
+| Parámetro (Oracle) | Valor                                 |
+| ------------------ | ------------------------------------- |
+| URL                | `jdbc:oracle:thin:@localhost:1521:XE` |
+| Driver             | `oracle.jdbc.driver.OracleDriver`     |
 
-#### Oracle 10g (Principal)
-
-| Parámetro  | Valor                                 |
-| ---------- | ------------------------------------- |
-| URL        | `jdbc:oracle:thin:@localhost:1521:XE` |
-| Usuario    | `USUARIO`                             |
-| Contraseña | `CONTRASEÑA`                          |
-| Driver     | `oracle.jdbc.driver.OracleDriver`     |
-
-#### PostgreSQL (Secundaria)
-
-| Parámetro | Valor                    |
-| --------- | ------------------------ |
-| Driver    | `org.postgresql.Driver`  |
-| JAR       | `postgresql-42.7.13.jar` |
+PostgreSQL: driver `org.postgresql.Driver`, JAR `postgresql-42.7.13.jar`.
 
 ---
 
 ## 5. Dependencias
-
-### 5.1 Librerías JAR
 
 | JAR                      | Ubicación | Descripción            |
 | ------------------------ | --------- | ---------------------- |
 | `ojdbc14.jar`            | `lib/`    | Driver JDBC Oracle 10g |
 | `postgresql-42.7.13.jar` | `lib/`    | Driver JDBC PostgreSQL |
 
-### 5.2 Tecnologías Utilizadas
-
-| Tecnología      | Versión          | Uso                                             |
-| --------------- | ---------------- | ----------------------------------------------- |
-| Java SE         | 1.8 / 11         | Lenguaje principal (compatible con ojdbc14.jar) |
-| Apache NetBeans | 31               | IDE de desarrollo                               |
-| Oracle Database | 10g (10.2.0.1.0) | Base de datos principal                         |
-| PostgreSQL      | -                | Base de datos secundaria                        |
-| JDBC            | -                | Conexión a bases de datos                       |
-| Apache Ant      | -                | Sistema de build                                |
-| Java Swing      | -                | Framework de UI                                 |
+| Tecnología      | Versión          | Uso                       |
+| --------------- | ---------------- | ------------------------- |
+| Java SE         | 1.8              | Lenguaje principal        |
+| Apache NetBeans | 31               | IDE                       |
+| Oracle Database | 10g (10.2.0.1.0) | BD principal              |
+| PostgreSQL      | -                | BD secundaria / migración |
+| Apache Ant      | -                | Build                     |
+| Java Swing      | -                | UI                        |
 
 ---
 
-## 6. Patrones de Diseño
+## 6. Capa Config: `ConexionOracle`
 
-### 6.1 Patrones Identificados
-
-| Patrón                       | Implementación                         | Estado                       |
-| ---------------------------- | -------------------------------------- | ---------------------------- |
-| **DAO (Data Access Object)** | Capa `dao/` para CRUD                  | ❌ No implementado           |
-| **MVC**                      | Separación Model-View-Controller       | ⚠️ Parcial (solo estructura) |
-| **Singleton (implícito)**    | `ConexionOracle` con conexión estática | ✅ Implementado básico       |
-| **POJO**                     | Clases en `model/`                     | ❌ No implementado           |
-
-### 6.2 Clase `ConexionOracle.java`
+Fábrica de conexiones. **No es un singleton:** cada llamada a `getConexion()` devuelve una
+**conexión nueva**, que quien la pide debe cerrar (try-with-resources). Así cada operación
+y cada transacción tienen su propia conexión.
 
 ```java
-public class ConexionOracle {
-    private static final String URL = "jdbc:oracle:thin:@localhost:1521:XE";
-    private static final String USER = "system";
-    private static final String PASSWORD = "password";
-    private static Connection conexion = null;
+public static Connection getConexion() throws SQLException   // abre una conexión nueva
+public static boolean probarConexion()                       // true si conecta
+```
 
-    public static Connection getConexion() {
-        if (conexion == null || conexion.isClosed()) {
-            Class.forName("oracle.jdbc.driver.OracleDriver");
-            conexion = DriverManager.getConnection(URL, USER, PASSWORD);
-        }
-        return conexion;
-    }
+- Lee `config.properties` y carga el driver en un bloque `static`.
+- Si falta el archivo o el driver, lanza `ExceptionInInitializerError` con un mensaje claro.
+
+Uso básico:
+
+```java
+try (Connection conn = ConexionOracle.getConexion()) {
+    // usar conn
+} catch (SQLException e) {
+    // manejar error
 }
 ```
 
-**Características:**
-
-- Conexión única estática (Singleton básico)
-- Lazy initialization
-- Manejo de excepciones básico
-- ⚠️ **Credenciales hardcodeadas** (no recomendado para producción)
-
 ---
 
-## 7. Entidades del Dominio
+## 7. Capa Model: entidades del dominio
 
-### 7.1 Entidades Planificadas
+Paquete `com.cooperativa.model`. POJOs con constructor vacío, constructor útil, getters/setters
+y `toString()` en los catálogos.
 
-| Entidad        | Descripción                    | Atributos Esperados                                |
-| -------------- | ------------------------------ | -------------------------------------------------- |
-| **Persona**    | Cooperativistas y clientes     | id, nombre, apellido, dni, dirección, teléfono     |
-| **Cuenta**     | Cuentas de ahorro              | id, persona_id, saldo, fecha_apertura              |
-| **Prestamo**   | Préstamos otorgados            | id, persona_id, monto, tasa_interes, fecha, estado |
-| **Producto**   | Semillas, abonos, insecticidas | id, nombre, descripción, precio, stock             |
-| **Hortalizas** | Productos agrícolas            | id, nombre, variedad, temporada                    |
-| **Albaranes**  | Documentos de entrega          | id, fecha, persona_id, productos, total            |
+### 7.1 Clases
 
-### 7.2 Diagrama de Relaciones (Conceptual)
+| Clase               | Descripción                                                         |
+| ------------------- | ------------------------------------------------------------------- |
+| `Sede`              | Sedes de la cooperativa en el país                                  |
+| `Estatus`           | Catálogo general de estatus (activo, inactivo, pagado, vencido…)    |
+| `TipoPersona`       | Empleado, socio u otro                                              |
+| `Persona`           | Empleados, socios y otras personas; tiene tipo, estatus y sede      |
+| `TipoCuenta`        | Ahorro, monetaria                                                   |
+| `Cuenta`            | Cuenta con tipo, estatus y sede                                     |
+| `CuentaPersona`     | Tabla puente: una cuenta puede tener varias personas (`titular`)    |
+| `Saldo`             | Registro de saldos de una cuenta por fecha                          |
+| `TipoPrestamo`      | Efectivo, hipotecario, consumo de productos                         |
+| `Prestamo`          | Registro del préstamo (monto, tasa, fechas, tipo, estatus)          |
+| `DetallePrestamo`   | Productos entregados en un préstamo de consumo                      |
+| `CategoriaProducto` | Insumos para socios vs. productos de exportación                    |
+| `Producto`          | Catálogo de productos (insumos y productos que entregan los socios) |
+| `Albaran`           | Documento de una entrega por talonario                              |
+| `DetalleAlbaran`    | Línea del albarán: cantidad aceptada y rechazada, precio            |
+
+### 7.2 Relaciones
 
 ```
-Persona (1) ───< Cuenta (N)
+Sede (1) ───< Persona (N)            Sede (1) ───< Cuenta (N)         Sede (1) ───< Albaran (N)
+TipoPersona (1) ───< Persona (N)     TipoCuenta (1) ───< Cuenta (N)   TipoPrestamo (1) ───< Prestamo (N)
+Estatus (1) ───< Persona / Cuenta / Prestamo (N)
+
+Cuenta (N) >───< Persona (N)         [tabla puente CuentaPersona]
+Cuenta (1) ───< Saldo (N)
 Persona (1) ───< Prestamo (N)
+Prestamo (1) ───< DetallePrestamo (N) >─── (1) Producto
+CategoriaProducto (1) ───< Producto (N)
 Persona (1) ───< Albaran (N)
-Albaran (N) ───> Producto (N)  [tabla puente]
+Albaran (1) ───< DetalleAlbaran (N) >─── (1) Producto
 ```
+
+### 7.3 Convenciones de mapeo POJO ↔ Oracle
+
+| Java                        | Oracle 10g                   | Notas                                                       |
+| --------------------------- | ---------------------------- | ----------------------------------------------------------- |
+| `int id`                    | `NUMBER(10)` PK              | Secuencia `SEQ_<TABLA>` + trigger (10g no tiene `IDENTITY`) |
+| `String`                    | `VARCHAR2(n)`                |                                                             |
+| `BigDecimal` (dinero)       | `NUMBER(12,2)`               | Nunca `double` para dinero                                  |
+| `BigDecimal` (tasa)         | `NUMBER(5,2)`                |                                                             |
+| `BigDecimal` (cantidad, kg) | `NUMBER(12,2)`               | En `DetalleAlbaran`                                         |
+| `java.util.Date`            | `DATE`                       | En el DAO: `new java.sql.Date(f.getTime())`                 |
+| `boolean`                   | `NUMBER(1)` (0/1)            | Oracle 10g no tiene `BOOLEAN` en SQL                        |
+| `campoId` (FK)              | `NUMBER(10)` + `FOREIGN KEY` | `personaId` → columna `persona_id`                          |
+
+- Los nombres de columna son el campo en `snake_case` (`fechaApertura` → `fecha_apertura`).
+- Tablas en plural y `snake_case`: `personas`, `cuentas`, `cuentas_personas`, `saldos`,
+  `prestamos`, `detalles_prestamo`, `productos`, `albaranes`, `detalles_albaran`,
+  `sedes`, `estatus`, `tipos_persona`, `tipos_cuenta`, `tipos_prestamo`, `categorias_producto`.
+- Oracle trata la cadena vacía `''` como `NULL`; tenerlo en cuenta en validaciones.
+- Paginación con `ROWNUM` (10g no tiene `LIMIT` ni `FETCH FIRST`).
 
 ---
 
 ## 8. Guías de Desarrollo
 
-### 8.1 Convenciones de Nomenclatura
+### 8.1 Nomenclatura
 
-| Elemento   | Convención       | Ejemplo                               |
-| ---------- | ---------------- | ------------------------------------- |
-| Clases     | PascalCase       | `PersonaDAO`, `ConexionOracle`        |
-| Métodos    | camelCase        | `obtenerPersona()`, `guardarCuenta()` |
-| Variables  | camelCase        | `nombreCliente`, `listaProductos`     |
-| Constantes | UPPER_SNAKE_CASE | `URL`, `USER`, `PASSWORD`             |
-| Paquetes   | minúsculas       | `com.cooperativa.dao`                 |
+| Elemento   | Convención       | Ejemplo                           |
+| ---------- | ---------------- | --------------------------------- |
+| Clases     | PascalCase       | `PersonaDAO`, `ConexionOracle`    |
+| Métodos    | camelCase        | `obtenerPorId()`, `guardar()`     |
+| Variables  | camelCase        | `nombreCliente`, `listaProductos` |
+| Constantes | UPPER_SNAKE_CASE | `ARCHIVO_CONFIG`                  |
+| Paquetes   | minúsculas       | `com.cooperativa.dao`             |
 
 ### 8.2 Estructura de un DAO
 
+Un DAO por entidad principal (`PersonaDAO`, `CuentaDAO`, `PrestamoDAO`, `ProductoDAO`,
+`AlbaranDAO`, y DAOs simples para los catálogos). Métodos estándar:
+
 ```java
-package com.cooperativa.dao;
-
-import com.cooperativa.model.Persona;
-import com.cooperativa.config.ConexionOracle;
-import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
-
 public class PersonaDAO {
-
-    // CREATE
-    public boolean guardar(Persona persona) { ... }
-
-    // READ
-    public Persona obtenerPorId(int id) { ... }
-    public List<Persona> obtenerTodos() { ... }
-
-    // UPDATE
-    public boolean actualizar(Persona persona) { ... }
-
-    // DELETE
-    public boolean eliminar(int id) { ... }
+    public boolean guardar(Persona p) throws SQLException { ... }
+    public Persona obtenerPorId(int id) throws SQLException { ... }
+    public List<Persona> obtenerTodos() throws SQLException { ... }
+    public boolean actualizar(Persona p) throws SQLException { ... }
+    public boolean eliminar(int id) throws SQLException { ... }
 }
 ```
 
-### 8.3 Estructura de una Entidad (POJO)
+Cuando una operación forma parte de una transacción mayor, el DAO ofrece una **sobrecarga
+que recibe la `Connection`** (`guardar(Persona p, Connection conn)`), y esa versión no la abre
+ni la cierra.
+
+### 8.3 Patrón de consulta
 
 ```java
-package com.cooperativa.model;
-
-public class Persona {
-    private int id;
-    private String nombre;
-    private String apellido;
-    private String dni;
-    private String direccion;
-    private String telefono;
-
-    // Constructores
-    public Persona() {}
-
-    public Persona(int id, String nombre, String apellido, String dni) {
-        this.id = id;
-        this.nombre = nombre;
-        this.apellido = apellido;
-        this.dni = dni;
-    }
-
-    // Getters y Setters
-    public int getId() { return id; }
-    public void setId(int id) { this.id = id; }
-
-    public String getNombre() { return nombre; }
-    public void setNombre(String nombre) { this.nombre = nombre; }
-
-    // ... resto de getters/setters
-
-    @Override
-    public String toString() {
-        return nombre + " " + apellido;
-    }
-}
-```
-
-### 8.4 Manejo de Conexiones
-
-```java
-// Patrón recomendado para operaciones de BD
-Connection conn = null;
-PreparedStatement stmt = null;
-ResultSet rs = null;
-
-try {
-    conn = ConexionOracle.getConexion();
+public Persona obtenerPorId(int id) throws SQLException {
     String sql = "SELECT * FROM personas WHERE id = ?";
-    stmt = conn.prepareStatement(sql);
-    stmt.setInt(1, id);
-    rs = stmt.executeQuery();
-
-    if (rs.next()) {
-        // Procesar resultados
+    try (Connection conn = ConexionOracle.getConexion();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+        ps.setInt(1, id);
+        try (ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return mapear(rs);   // método privado ResultSet -> Persona
+            }
+        }
     }
-} catch (SQLException e) {
-    e.printStackTrace();
-} finally {
-    // Cerrar recursos en orden inverso
-    if (rs != null) try { rs.close(); } catch (SQLException e) {}
-    if (stmt != null) try { stmt.close(); } catch (SQLException e) {}
-    if (conn != null) try { conn.close(); } catch (SQLException e) {}
+    return null;
 }
 ```
+
+- **Siempre** `PreparedStatement` (evita SQL Injection). Nunca concatenar valores en el SQL.
+- Cada DAO tiene un método privado `mapear(ResultSet)` que construye el POJO.
+- Cada operación abre y cierra su conexión con try-with-resources.
+
+### 8.4 Transacciones
+
+Las operaciones que tocan varias tablas deben ser **atómicas**. Caso típico: registrar un
+albarán (encabezado + detalles + actualización de stock/saldo del socio).
+
+```java
+try (Connection conn = ConexionOracle.getConexion()) {
+    conn.setAutoCommit(false);
+    try {
+        albaranDAO.guardar(albaran, conn);          // encabezado + detalles
+        // otros DAOs con la misma conn: stock, saldo, etc.
+        conn.commit();
+    } catch (SQLException e) {
+        conn.rollback();
+        throw e;
+    }
+}
+```
+
+Casos que requieren transacción: albarán, préstamo de consumo (préstamo + detalle + stock),
+movimientos de saldo.
+
+### 8.5 Reglas de negocio a validar en el Controller
+
+- Solo una persona con estatus **activo** puede recibir préstamos o abrir cuentas.
+- Un préstamo de **consumo de productos** debe tener al menos un `DetallePrestamo` y descontar stock.
+- Un préstamo de **efectivo / hipotecario** no lleva detalle.
+- El **total del albarán** se calcula solo con la cantidad **aceptada** (`DetalleAlbaran.getSubtotal()`).
+- Una cuenta debe tener al menos una persona titular.
+
+### 8.6 UI (Swing)
+
+- Iniciar la UI con `SwingUtilities.invokeLater()`.
+- Usar `SwingWorker` para consultas a BD, para no congelar la ventana.
+- La vista solo llama al Controller; no contiene SQL ni reglas de negocio.
+
+### 8.7 Seguridad
+
+- Credenciales solo en `config.properties` (ignorado por Git).
+- Solo `PreparedStatement`.
+- No imprimir contraseñas ni la cadena de conexión completa en logs.
 
 ---
 
 ## 9. Comandos de Build y Ejecución
 
-### 9.1 Compilar el Proyecto
-
 ```bash
-# Desde la raíz del proyecto (usando Ant)
-ant compile
-
-# O compilar todo incluyendo JAR
-ant jar
+ant clean
+ant compile      # compilar
+ant jar          # generar el JAR en dist/
 ```
 
-### 9.2 Ejecutar la Aplicación
+Desde NetBeans: **F11** (Clean and Build) y **F6** (Run).
+Por línea de comandos, el separador del classpath es `;` en Windows y `:` en Linux/Mac:
 
 ```bash
-# Desde NetBeans: botón derecho > Run File
-# O desde línea de comandos:
 java -cp "build/classes;lib/ojdbc14.jar;lib/postgresql-42.7.13.jar" com.cooperativa.main.Main
 ```
 
-### 9.3 Limpiar y Reconstruir
+`config.properties` debe estar en el directorio desde donde se ejecuta (la raíz del proyecto).
 
-```bash
-ant clean
-ant jar
-```
-
----
-
-## 10. Archivos de Configuración
-
-### 10.1 `nbproject/project.properties`
-
-- Configuración de compilación
-- Definición de la clase principal
-- Referencias a JARs de dependencias (rutas relativas)
-
-### 10.2 `nbproject/project.xml`
-
-- Definición del proyecto NetBeans
-- Raíces de código fuente y pruebas
-
-### 10.3 `build.xml`
-
-- Script Ant para build personalizado
-- Usa `nbproject/build-impl.xml` como base
-
-### 10.4 `manifest.mf`
-
-- Manifest del JAR
-- `Main-Class` se agrega automáticamente
-
-### 10.5 `.gitignore`
+`.gitignore`:
 
 ```
 build/
 dist/
 nbproject/private/
 *.class
+config.properties
+```
+
+---
+
+## 10. Flujo de trabajo con Git
+
+- `main` siempre debe compilar. No se trabaja directamente sobre `main`.
+- **Una rama por tarea**, con prefijo `feature/`: `feature/model`, `feature/persona-dao`,
+  `feature/scripts-sql`, `feature/vista-personas`.
+- Mensajes de commit cortos y en español: `Agrega clases del paquete model`.
+- Integración mediante **Pull Request** revisado por otro integrante.
+- Antes de seguir trabajando, traer lo nuevo de `main` a la rama propia.
+- Antes de commitear, revisar `git diff`: NetBeans puede modificar `nbproject/project.properties`
+  con rutas absolutas; no subir ese cambio.
+
+```bash
+git checkout main && git pull origin main
+git checkout -b feature/nombre-de-la-tarea
+git add . && git commit -m "Descripción del cambio"
+git push -u origin feature/nombre-de-la-tarea
 ```
 
 ---
@@ -447,87 +440,65 @@ nbproject/private/
 ### 11.1 Completado
 
 - [x] Estructura de carpetas del proyecto
-- [x] Clase `Main.java` (punto de entrada)
-- [x] Clase `ConexionOracle.java` (conexión JDBC)
-- [x] Configuración del proyecto NetBeans
-- [x] Dependencias JAR configuradas (rutas relativas)
-- [x] README.md con documentación básica
+- [x] Configuración NetBeans y dependencias JAR (rutas relativas)
+- [x] `ConexionOracle` con `config.properties` (conexión nueva por llamada)
+- [x] `Main` con prueba de conexión (`probarConexion()`)
+- [x] Diseño de las entidades del dominio a partir del documento de trabajo
 
-### 11.2 Pendiente
+### 11.2 En progreso
 
-- [ ] Capa Model (entidades POJO)
-- [ ] Capa DAO (CRUD para cada entidad)
-- [ ] Capa View (interfaces Swing)
-- [ ] Capa Utils (reportes PDF, Hot Backup)
-- [ ] Scripts SQL de creación de tablas
-- [ ] Lógica de negocio completa
-- [ ] Pruebas unitarias
-- [ ] Manejo de transacciones
-- [ ] Validaciones de datos
-- [ ] Manejo de errores robusto
+- [ ] Capa Model: 15 clases POJO (compilar y subir a `feature/model`)
 
----
+### 11.3 Pendiente
 
-## 12. Notas Importantes para Desarrolladores
-
-### 12.1 Seguridad
-
-- ⚠️ **Las credenciales de la base de datos están hardcodeadas** en `ConexionOracle.java`
-- **Recomendación**: Mover a un archivo de configuración externo o variables de entorno
-- **Recomendación**: Usar `PreparedStatement` para prevenir SQL Injection
-
-### 12.2 Manejo de Recursos
-
-- **Siempre cerrar** `Connection`, `Statement` y `ResultSet` en bloque `finally`
-- Considerar usar **try-with-resources** (Java 7+)
-- No mantener conexiones abiertas innecesariamente
-
-### 12.3 Transacciones
-
-- Para operaciones que requieren múltiples INSERT/UPDATE:
-  ```java
-  conn.setAutoCommit(false);
-  try {
-      // múltiples operaciones
-      conn.commit();
-  } catch (SQLException e) {
-      conn.rollback();
-  }
-  ```
-
-### 12.4 UI (Swing)
-
-- Usar `SwingUtilities.invokeLater()` para iniciar la UI
-- Considerar usar `SwingWorker` para operaciones de BD en segundo plano
-- Separar la lógica de presentación de la lógica de negocio
+- [ ] Scripts SQL de creación de tablas, secuencias y datos de catálogos (`scripts/`)
+- [ ] Capa DAO (empezar por `PersonaDAO`, luego catálogos, cuentas, productos, préstamos, albaranes)
+- [ ] Capa Controller con las reglas de la sección 8.5
+- [ ] Transacciones (albarán, préstamo de consumo, saldos)
+- [ ] Capa View (pantallas Swing)
+- [ ] Utils: PDF de albaranes y Hot Backup
+- [ ] Migración / pruebas con PostgreSQL (Fase IV)
+- [ ] Pruebas y validaciones de datos
 
 ---
 
-## 13. Equipo de Desarrollo
+## 12. Dudas abiertas (confirmar con el equipo)
 
-| Integrante                          | Rol |
-| ----------------------------------- | --- |
-| (Ver README.md para lista completa) | -   |
-
----
-
-## 14. Referencias
-
-- [Documentación oficial de Java SE](https://docs.oracle.com/en/java/)
-- [JDBC Tutorial](https://docs.oracle.com/javase/tutorial/jdbc/)
-- [NetBeans IDE Documentation](https://netbeans.apache.org/)
-- [Oracle 10g Documentation](https://docs.oracle.com/cd/B19306_01/server.102/b14220/toc.htm)
+1. `Albarán` y las entregas por talonario aparecen en la descripción del negocio pero no
+   en la lista de entidades del documento. Se incluyeron; confirmar que BD y documentación
+   también las tengan.
+2. El documento habla de "importación" de productos agrícolas pero describe lo que los socios
+   **entregan** y la cooperativa **exporta**. Se nombró la categoría `PRODUCTO_EXPORTACION`;
+   confirmar el término.
+3. `Hortaliza` ya no es una entidad aparte: las hortalizas son `Producto` con su
+   `CategoriaProducto`.
 
 ---
 
-## 15. Historial de Cambios
+## 13. Instrucciones para agentes de IA
 
-| Fecha      | Cambio                                                                      | Autor     |
-| ---------- | --------------------------------------------------------------------------- | --------- |
-| 2026-10-01 | Creación inicial del documento AGENTS.MD                                    | Agente IA |
-| 2026-10-01 | Añadida sección 0 (Alcance) para dejar claro que es Java SE, no C#/.NET/WPF | Agente IA |
-| 2026-10-01 | Fijado `javac.source/target=1.8` por compatibilidad con `ojdbc14.jar`       | Agente IA |
-| 2026-10-01 | Sustituidas rutas absolutas de JAR por rutas relativas a `lib/`             | Agente IA |
+- Responder y comentar el código **en español**.
+- Código compatible con **Java 8**; respetar la estructura de paquetes de la sección 2.
+- No agregar dependencias nuevas sin avisar y sin ponerlas en `lib/` con ruta relativa.
+- Dinero siempre `BigDecimal`; fechas con `java.util.Date`.
+- Todo SQL con `PreparedStatement` y recursos cerrados con try-with-resources.
+- No subir credenciales ni modificar `nbproject/project.properties` con rutas absolutas.
+- No cambiar nombres o tipos de las clases `model` sin avisar: BD y vista dependen de ellas.
+- Actualizar este archivo (sección 11 y sección 14) cuando cambie la arquitectura,
+  las dependencias o las convenciones.
+
+---
+
+## 14. Historial de Cambios
+
+| Fecha      | Cambio                                                                                             | Autor     |
+| ---------- | -------------------------------------------------------------------------------------------------- | --------- |
+| 2026-10-01 | Creación inicial del documento AGENTS.MD                                                           | Agente IA |
+| 2026-10-01 | Fijado `javac.source/target=1.8` por compatibilidad con `ojdbc14.jar`                              | Agente IA |
+| 2026-10-01 | Rutas de JAR relativas a `lib/`                                                                    | Agente IA |
+| 2026-10-01 | `ConexionOracle` lee credenciales de `config.properties`; sin conexión estática                    | Agente IA |
+| 2026-10-01 | Entidades rediseñadas según el documento de trabajo (15 clases, catálogos); se elimina `Hortaliza` | Agente IA |
+| 2026-10-01 | Añadidos Controller, mapeo Oracle, reglas de negocio, flujo Git y dudas abiertas                   | Agente IA |
 
 ---
 
