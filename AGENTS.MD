@@ -80,7 +80,6 @@ SistemaCooperativaAgricola/
 ├── lib/
 │   ├── ojdbc14.jar
 │   └── postgresql-42.7.13.jar
-├── scripts/                 # DDL/DML para Oracle 10g y PostgreSQL
 ├── nbproject/               # Configuración NetBeans (private/ se ignora)
 ├── build.xml
 ├── manifest.mf
@@ -89,6 +88,9 @@ SistemaCooperativaAgricola/
 ├── README.md
 └── AGENTS.MD
 ```
+
+> **Estado real de las carpetas:** existen `config/`, `model/`, `dao/` y `main/`.
+> `controller/`, `view/`, `utils/` y `scripts/` **todavía no están creadas**.
 
 ---
 
@@ -109,15 +111,36 @@ VIEW (Swing)  →  CONTROLLER (lógica de negocio)  →  DAO (SQL / JDBC)  →  
 
 ### 3.2 Estado por capa
 
-| Capa           | Paquete                      | Responsabilidad              | Estado             |
-| -------------- | ---------------------------- | ---------------------------- | ------------------ |
-| **Config**     | `com.cooperativa.config`     | Fábrica de conexiones JDBC   | ✅ Implementada    |
-| **Model**      | `com.cooperativa.model`      | 15 entidades POJO            | 🔄 En progreso     |
-| **DAO**        | `com.cooperativa.dao`        | CRUD y transacciones         | ❌ Por implementar |
-| **Controller** | `com.cooperativa.controller` | Reglas de negocio            | ❌ Por implementar |
-| **View**       | `com.cooperativa.view`       | Pantallas Swing              | ❌ Por implementar |
-| **Utils**      | `com.cooperativa.utils`      | PDF de albaranes, Hot Backup | ❌ Por implementar |
-| **Main**       | `com.cooperativa.main`       | Entrada y prueba de conexión | ✅ Implementada    |
+| Capa           | Paquete                      | Responsabilidad                | Estado                    |
+| -------------- | ---------------------------- | ------------------------------ | ------------------------- |
+| **Config**     | `com.cooperativa.config`     | Fábrica de conexiones JDBC     | ✅ Implementada           |
+| **Model**      | `com.cooperativa.model`      | 15 entidades POJO              | ✅ Implementada           |
+| **DAO**        | `com.cooperativa.dao`        | CRUD y transacciones           | ✅ Implementada (15 DAOs) |
+| **Controller** | `com.cooperativa.controller` | Reglas de negocio              | ❌ No existe aún          |
+| **View**       | `com.cooperativa.view`       | Pantallas Swing                | ❌ No existe aún          |
+| **Utils**      | `com.cooperativa.utils`      | PDF de albaranes, Hot Backup   | ❌ No existe aún          |
+| **Main**       | `com.cooperativa.main`       | Prueba de conexión y albaranes | ✅ Implementada           |
+
+> **Las carpetas `controller/`, `view/` y `utils/` aún no están creadas en disco.**
+> `model/`, `dao/`, `config/` y `main/` son las únicas con código.
+
+### 3.3 Por qué se implementaron `model` y `dao` antes que el resto
+
+Es una decisión de la regla de trabajo del equipo (sección 1.2), no un descuido:
+
+1. **`model` fija el contrato.** Las 15 clases POJO definen los nombres de campo y tipos
+   que la BD y la Swing van a consumir. Si el modelo cambia después, se rompen el DDL,
+   los `mapear()` de los DAO y las pantallas. Es la capa de menor riesgo para montar primero.
+2. **`dao` cierra el circuito con la BD.** Los DAO fijan los **nombres de tabla y columna**
+   (`personas.tipo_persona_id`, `detalles_albaran.cantidad_aceptada`, …). José necesita
+   esas columnas exactas para escribir el DDL, así que los DAO son la especificación que
+   consume el modelado de BD.
+3. **`controller`, `view` y `utils` dependen de ambos.** El controller llama a firmas de
+   DAO ya decididas; la vista consume POJOs ya cerrados. Se pueden escribir al final
+   sin bloquear a nadie.
+4. **Se validó en conjunto.** `Main` ya exercises el camino completo del albarán
+   (encabezado + detalles en una transacción), así que el backend tiene una prueba de
+   humo real antes de existir la interfaz.
 
 ---
 
@@ -140,6 +163,21 @@ dist.jar=${dist.dir}/SistemaCooperativaAgricola.jar
 src.dir=src
 test.src.dir=test
 ```
+
+> ⚠️ **El archivo real `nbproject/project.properties` todavía NO coincide con este bloque.**
+> Al momento de esta revisión (2026-10-01) contiene:
+>
+> ```properties
+> javac.source=26
+> javac.target=26
+> file.reference.ojdbc14.jar=C:\\oraclexe\\app\\oracle\\product\\10.2.0\\server\\jdbc\\lib\\ojdbc14.jar
+> file.reference.postgresql-42.7.13.jar=C:\\Users\\Julio Cesar\\Downloads\\postgresql-42.7.13.jar
+> ```
+>
+> Los 4 valores de arriba son la **configuración objetivo**; el código actual compila
+> con ellos en la máquina de Julio César, pero **rompe al clonar el repo** en la de
+> cualquier otro integrante. Corregir antes de volver a hacer commit
+> (ver la sección 4.2).
 
 ### 4.2 Reglas importantes
 
@@ -287,50 +325,220 @@ Albaran (1) ───< DetalleAlbaran (N) >─── (1) Producto
 - Oracle trata la cadena vacía `''` como `NULL`; tenerlo en cuenta en validaciones.
 - Paginación con `ROWNUM` (10g no tiene `LIMIT` ni `FETCH FIRST`).
 
+### 7.4 Lógica de negocio dentro de `model` (excepción consciente)
+
+Tres POJOs llevan comportamiento, no solo datos. Es intencional: son cálculos que
+dependen **solo** del propio objeto, sin BD ni reglas de negocio, así que se pueden
+usar igual desde un DAO, el controller o la vista.
+
+| Método                            | Clase            | Qué hace                                |
+| --------------------------------- | ---------------- | --------------------------------------- |
+| `calcularTotal()`                 | `Albaran`        | Suma los subtotales de los detalles     |
+| `getSubtotal()`                   | `DetalleAlbaran` | `cantidadAceptada × precioUnitario`     |
+| `agregarDetalle(DetalleAlbaran)`  | `Albaran`        | Añade una línea a la lista de detalles  |
+| `agregarDetalle(DetallePrestamo)` | `Prestamo`       | Añade una línea de producto al préstamo |
+
+El resto de las 15 clases son POJOs planos: constructor vacío, constructor útil,
+getters/setters y `toString()`. `Prestamo` y `Albaran` son los únicos con lista de
+detalles, inicializada a `new ArrayList<...>()` para que nunca sea `null`.
+
+`DetalleAlbaran` tiene un constructor de 4 parámetros, usado por `Main` al armar el
+albarán de prueba:
+
+```java
+public DetalleAlbaran(int productoId, BigDecimal cantidadAceptada,
+                      BigDecimal cantidadRechazada, BigDecimal precioUnitario)
+```
+
+**El total del albarán se calcula solo con lo aceptado**, nunca con la cantidad
+entregada: lo rechazado no se le paga al socio.
+
 ---
 
-## 8. Guías de Desarrollo
+## 8. Capa DAO: los 15 DAOs implementados
 
-### 8.1 Nomenclatura
+`com.cooperativa.dao` tiene **un DAO por entidad de `model`**. Los 15 compilan y están
+probados contra Oracle mediante `Main`.
+
+| DAO                    | Tabla                 | Métodos propios además del CRUD estándar                                                 |
+| ---------------------- | --------------------- | ---------------------------------------------------------------------------------------- |
+| `SedeDAO`              | `sedes`               | —                                                                                        |
+| `EstatusDAO`           | `estatus`             | `obtenerPorNombre(String)`                                                               |
+| `TipoPersonaDAO`       | `tipos_persona`       | —                                                                                        |
+| `TipoCuentaDAO`        | `tipos_cuenta`        | —                                                                                        |
+| `TipoPrestamoDAO`      | `tipos_prestamo`      | —                                                                                        |
+| `CategoriaProductoDAO` | `categorias_producto` | —                                                                                        |
+| `PersonaDAO`           | `personas`            | `obtenerPorDni()`, `obtenerPorTipo()`, `cambiarEstatus()`                                |
+| `CuentaDAO`            | `cuentas`             | `obtenerPorNumero()`, `obtenerPorPersona()` (JOIN con `cuentas_personas`)                |
+| `CuentaPersonaDAO`     | `cuentas_personas`    | `agregar()`, `cambiarTitular()`, `quitar()`, `obtenerPorCuenta()`, `obtenerPorPersona()` |
+| `SaldoDAO`             | `saldos`              | `registrar()`, `obtenerActual()` (con `ROWNUM = 1`), `obtenerHistorial()`                |
+| `PrestamoDAO`          | `prestamos`           | `cambiarEstatus()`, `obtenerPorIdConDetalles()`, `obtenerPorPersona()`                   |
+| `DetallePrestamoDAO`   | `detalles_prestamo`   | `guardar()`, `obtenerPorPrestamo()`                                                      |
+| `ProductoDAO`          | `productos`           | `obtenerPorCategoria()`, **`descontarStock()`**, **`aumentarStock()`**                   |
+| `AlbaranDAO`           | `albaranes`           | `obtenerPorNumeroTalonario()`, `obtenerPorIdConDetalles()`, `obtenerPorPersona()`        |
+| `DetalleAlbaranDAO`    | `detalles_albaran`    | `guardar()`, `obtenerPorAlbaran()`                                                       |
+
+### 8.1 Patrones que sigue TODOS los DAO (verificados en el código)
+
+**a) Constante `COLUMNAS` y SQL sin `SELECT *`.**
+Los DAO principales (`Persona`, `Cuenta`, `Prestamo`, `Producto`, `Albaran`) declaran
+`private static final String COLUMNAS` y la concatenan en cada consulta. Los DAO de
+catálogo y de línea de detalle escriben la lista de columnas en el literal.
+
+**b) Sobrecarga con `Connection` para transacciones.**
+Este es el patrón central del proyecto. La versión sin `Connection` abre y cierra la suya
+con try-with-resources (commit automático); la versión con `Connection` **no abre ni cierra**
+nada, para poder encadenarla dentro de la transacción de otro DAO:
+
+```java
+public boolean guardar(Persona p) throws SQLException {
+    try (Connection conn = ConexionOracle.getConexion()) {
+        return guardar(p, conn);   // delega
+    }
+}
+
+public boolean guardar(Persona p, Connection conn) throws SQLException { ... }
+```
+
+**c) ID con secuencia Oracle, nunca con trigger ni `IDENTITY`.**
+Cada DAO tiene un `siguienteId(Connection)` privado que pide el valor a la secuencia:
+
+```java
+private int siguienteId(Connection conn) throws SQLException {
+    try (PreparedStatement ps = conn.prepareStatement("SELECT seq_personas.NEXTVAL FROM dual");
+         ResultSet rs = ps.executeQuery()) {
+        rs.next();
+        return rs.getInt(1);
+    }
+}
+```
+
+Convenciones de nombre de secuencia: `seq_personas`, `seq_cuentas`, `seq_saldos`,
+`seq_prestamos`, `seq_detalles_prestamo`, `seq_productos`, `seq_albaranes`,
+`seq_detalles_albaran`, `seq_sedes`, `seq_estatus`, `seq_tipos_persona`,
+`seq_tipos_cuenta`, `seq_tipos_prestamo`, `seq_categorias_producto`.
+
+**d) Método privado `mapear(ResultSet)`.**
+Cada DAO tiene un único `mapear` que construye el POJO. `AlbaranDAO`, `PrestamoDAO` y
+`PersonaDAO` lo usan en todas sus consultas; los catálogos también.
+
+**e) Fechas de alta con `SYSDATE`, no desde Java.**
+`personas.fecha_registro`, `albaranes.fecha`, `prestamos.fecha`, `saldos.fecha` y
+`cuentas.fecha_apertura` se llenan en el `INSERT` con `SYSDATE`, por eso esas columnas no
+llegan como parámetro `?`.
+
+**f) `null` cuando no hay resultado.**
+Todos los `obtenerPorId` devuelven `null` si el `ResultSet` está vacío (no lanzan excepción).
+
+**g) Fecha de lectura con `getTimestamp`.**
+Los `mapear` leen fechas con `rs.getTimestamp(...)` y las guardan en `java.util.Date`
+(conserva la hora). En `PrestamoDAO`, al escribir, se usa
+`new java.sql.Date(f.getTime())` y `setNull(..., Types.DATE)` cuando es `null`.
+
+**h) Booleanos como `NUMBER(1)`.**
+`CuentaPersonaDAO` mapea `titular` con `rs.getInt("titular") == 1` y escribe
+`cp.isTitular() ? 1 : 0`.
+
+### 8.2 Notas de diseño por DAO
+
+**`ProductoDAO.descontarStock(int, int, Connection)`** — descuenta stock de forma atómica
+con una sola sentencia y devuelve `false` si no hay inventario, sin modificar nada:
+
+```java
+String sql = "UPDATE productos SET stock = stock - ? WHERE id = ? AND stock >= ?";
+```
+
+Solo existe en la versión con `Connection`: siempre se usa dentro de la transacción de un
+préstamo de consumo. `aumentarStock` sí suma sin condición.
+
+**`SaldoDAO.obtenerActual(int, Connection)`** — el saldo vigente es el registro más
+reciente, con el patrón de subconsulta que sí funciona en Oracle 10g (no hay
+`ORDER BY` dentro de un `INLINE VIEW` sin `FETCH FIRST`):
+
+```sql
+SELECT id, cuenta_id, monto, fecha FROM (
+  SELECT id, cuenta_id, monto, fecha FROM saldos
+  WHERE cuenta_id = ? ORDER BY fecha DESC, id DESC
+) WHERE ROWNUM = 1
+```
+
+Existe con y sin `Connection` porque hay que **leer el saldo antes de modificarlo**
+dentro de la misma transacción.
+
+**`CuentaDAO.obtenerPorPersona(int)`** — resuelve el many-to-many de la tabla puente
+`cuentas_personas` con un `JOIN` explícito. No consulta "solo titulares": trae cualquier
+persona asociada.
+
+**Borrados físicos con `ORA-02292`.** `eliminar()` hace `DELETE` directo. Si la fila ya
+está referenciada, Oracle lanza `ORA-02292` (violación de FK) y eso **es intencional**: los
+Javadoc de `SedeDAO`, `CuentaDAO`, `ProductoDAO` y `EstatusDAO` lo advertían. Para dar de
+baja sin borrar está `cambiarEstatus(id, estatusId)`, disponible en `PersonaDAO`,
+`CuentaDAO` y `PrestamoDAO`.
+
+### 8.3 Encabezado + detalle (composición)
+
+`AlbaranDAO.obtenerPorIdConDetalles(int)` y `PrestamoDAO.obtenerPorIdConDetalles(int)`
+llaman a su `obtenerPorId` y luego inyectan la lista con
+`new DetalleAlbaranDAO().obtenerPorAlbaran(id)`. El DAO de detalle no sabe nada del
+encabezado: solo usa `d.getAlbaranId()`, que debe venir ya asignado por el llamador.
+
+`DetalleAlbaranDAO` y `DetallePrestamoDAO` **no implementan `eliminar()` ni
+`actualizar()`**: son líneas inmutables de su encabezado. Si una línea cambia, se rehace el
+albarán o el préstamo.
+
+### 8.4 Qué NO hay todavía en la capa DAO
+
+- **Sin transacciones dentro de los DAO.** La transacción la abre y cierra el llamador
+  (`Main` o el futuro controller) y pasa la `Connection` a cada DAO.
+- **Sin paginación.** No hay métodos paginados ni uso de `ROWNUM` para listados, solo para
+  `obtenerActual`. Cuando se necesiten, agregarlos sin romper las firmas actuales.
+- **Sin búsqueda de texto** (`LIKE` por nombre, DNI parcial, talonario parcial).
+- **Sin operaciones en lote** (importar/exportar Catálogo de productos, partidas de albarán).
+- **Sin soporte PostgreSQL.** Todo el SQL es Oracle 10g.
+
+---
+
+## 9. Guías de Desarrollo
+
+### 9.1 Nomenclatura
 
 | Elemento   | Convención       | Ejemplo                           |
 | ---------- | ---------------- | --------------------------------- |
 | Clases     | PascalCase       | `PersonaDAO`, `ConexionOracle`    |
 | Métodos    | camelCase        | `obtenerPorId()`, `guardar()`     |
 | Variables  | camelCase        | `nombreCliente`, `listaProductos` |
-| Constantes | UPPER_SNAKE_CASE | `ARCHIVO_CONFIG`                  |
+| Constantes | UPPER_SNAKE_CASE | `ARCHIVO_CONFIG`, `COLUMNAS`      |
 | Paquetes   | minúsculas       | `com.cooperativa.dao`             |
 
-### 8.2 Estructura de un DAO
+Alumnos de español, no de inglés: los métodos de negocio usan
+`obtenerPorId`, `obtenerTodos`, `cambiarEstatus`, `descontarStock`, `registrar`,
+`agregarDetalle`. Los comentarios y los mensajes de error, en español.
 
-Un DAO por entidad principal (`PersonaDAO`, `CuentaDAO`, `PrestamoDAO`, `ProductoDAO`,
-`AlbaranDAO`, y DAOs simples para los catálogos). Métodos estándar:
+### 9.2 Cómo escribir un DAO nuevo (checklist)
+
+1. Un DAO por entidad de `model`, mismo nombre con sufijo `DAO`.
+2. `private static final String COLUMNAS` con la lista explícita de columnas.
+3. `siguienteId(Connection)` con `SELECT seq_<tabla>.NEXTVAL FROM dual`.
+4. Par de métodos `guardar(X)` y `guardar(X, Connection)`, con delegación entre ambos.
+5. `obtenerPorId`, `obtenerTodos`, `actualizar`, `eliminar` con `throws SQLException`.
+6. `private X mapear(ResultSet)` como único constructor de POJO desde BD.
+7. Todo `SELECT` con columnas explícitas y `ORDER BY` estable.
+8. Fechas de alta con `SYSDATE` en el SQL; fechas de lectura con `getTimestamp`.
+9. Recursos con try-with-resources, incluido el `ResultSet` en la misma cadena.
+10. Javadoc en español en los métodos con comportement no obvio (transaccional,
+    borrado que falla por FK, descuenta condicional de stock).
+
+### 9.3 Patrón de consulta (ejemplo real, `SedeDAO`)
 
 ```java
-public class PersonaDAO {
-    public boolean guardar(Persona p) throws SQLException { ... }
-    public Persona obtenerPorId(int id) throws SQLException { ... }
-    public List<Persona> obtenerTodos() throws SQLException { ... }
-    public boolean actualizar(Persona p) throws SQLException { ... }
-    public boolean eliminar(int id) throws SQLException { ... }
-}
-```
-
-Cuando una operación forma parte de una transacción mayor, el DAO ofrece una **sobrecarga
-que recibe la `Connection`** (`guardar(Persona p, Connection conn)`), y esa versión no la abre
-ni la cierra.
-
-### 8.3 Patrón de consulta
-
-```java
-public Persona obtenerPorId(int id) throws SQLException {
-    String sql = "SELECT * FROM personas WHERE id = ?";
+public Sede obtenerPorId(int id) throws SQLException {
+    String sql = "SELECT id, nombre, direccion, departamento FROM sedes WHERE id = ?";
     try (Connection conn = ConexionOracle.getConexion();
          PreparedStatement ps = conn.prepareStatement(sql)) {
         ps.setInt(1, id);
         try (ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
-                return mapear(rs);   // método privado ResultSet -> Persona
+                return mapear(rs);
             }
         }
     }
@@ -339,20 +547,24 @@ public Persona obtenerPorId(int id) throws SQLException {
 ```
 
 - **Siempre** `PreparedStatement` (evita SQL Injection). Nunca concatenar valores en el SQL.
-- Cada DAO tiene un método privado `mapear(ResultSet)` que construye el POJO.
+- **Nunca** `SELECT *`: el orden de columnas no está garantizado y el mapeo se rompe.
 - Cada operación abre y cierra su conexión con try-with-resources.
+- En las listas, el `ResultSet` va en la misma cadena del `try`.
 
-### 8.4 Transacciones
+### 9.4 Transacciones
 
-Las operaciones que tocan varias tablas deben ser **atómicas**. Caso típico: registrar un
-albarán (encabezado + detalles + actualización de stock/saldo del socio).
+Las operaciones que tocan varias tablas deben ser **atómicas**. El patrón ya validado
+está en `Main.registrarAlbaran(Albaran)`: encabezado + todas sus líneas, o nada.
 
 ```java
 try (Connection conn = ConexionOracle.getConexion()) {
     conn.setAutoCommit(false);
     try {
-        albaranDAO.guardar(albaran, conn);          // encabezado + detalles
-        // otros DAOs con la misma conn: stock, saldo, etc.
+        albaranDAO.guardar(albaran, conn);
+        for (DetalleAlbaran d : albaran.getDetalles()) {
+            d.setAlbaranId(albaran.getId());   // el DAO de detalle no lo adivina
+            detalleDAO.guardar(d, conn);
+        }
         conn.commit();
     } catch (SQLException e) {
         conn.rollback();
@@ -361,24 +573,34 @@ try (Connection conn = ConexionOracle.getConexion()) {
 }
 ```
 
-Casos que requieren transacción: albarán, préstamo de consumo (préstamo + detalle + stock),
-movimientos de saldo.
+Casos que requieren transacción: albarán, préstamo de consumo
+(encabezado + detalle + `descontarStock`), apertura de cuenta (cuenta + titulares +
+saldo inicial), movimientos de saldo.
 
-### 8.5 Reglas de negocio a validar en el Controller
+**Al escribir detalles dentro de una transacción, el llamador asigna la FK**
+(`d.setAlbaranId(a.getId())`) después de guardar el encabezado.
+
+### 9.5 Reglas de negocio a validar en el Controller
 
 - Solo una persona con estatus **activo** puede recibir préstamos o abrir cuentas.
-- Un préstamo de **consumo de productos** debe tener al menos un `DetallePrestamo` y descontar stock.
+- Un préstamo de **consumo de productos** debe tener al menos un `DetallePrestamo` y
+  descontar stock con `descontarStock`; si devuelve `false`, no hay inventario y la
+  transacción debe revertirse.
 - Un préstamo de **efectivo / hipotecario** no lleva detalle.
-- El **total del albarán** se calcula solo con la cantidad **aceptada** (`DetalleAlbaran.getSubtotal()`).
+- El **total del albarán** se calcula solo con la cantidad **aceptada**
+  (`DetalleAlbaran.getSubtotal()` → `Albaran.calcularTotal()`).
 - Una cuenta debe tener al menos una persona titular.
+- `numero_talonario` es único: `Main` prueba el duplicado a propósito y espera
+  `SQLException`.
 
-### 8.6 UI (Swing)
+### 9.6 UI (Swing)
 
 - Iniciar la UI con `SwingUtilities.invokeLater()`.
 - Usar `SwingWorker` para consultas a BD, para no congelar la ventana.
 - La vista solo llama al Controller; no contiene SQL ni reglas de negocio.
+- La vista carga catálogos con los `obtenerTodos()` de los DAO simples.
 
-### 8.7 Seguridad
+### 9.7 Seguridad
 
 - Credenciales solo en `config.properties` (ignorado por Git).
 - Solo `PreparedStatement`.
@@ -386,7 +608,7 @@ movimientos de saldo.
 
 ---
 
-## 9. Comandos de Build y Ejecución
+## 10. Comandos de Build y Ejecución
 
 ```bash
 ant clean
@@ -415,7 +637,7 @@ config.properties
 
 ---
 
-## 10. Flujo de trabajo con Git
+## 11. Flujo de trabajo con Git
 
 - `main` siempre debe compilar. No se trabaja directamente sobre `main`.
 - **Una rama por tarea**, con prefijo `feature/`: `feature/model`, `feature/persona-dao`,
@@ -435,34 +657,47 @@ git push -u origin feature/nombre-de-la-tarea
 
 ---
 
-## 11. Estado del Proyecto
+## 12. Estado del Proyecto
 
-### 11.1 Completado
+### 12.1 Completado
 
 - [x] Estructura de carpetas del proyecto
-- [x] Configuración NetBeans y dependencias JAR (rutas relativas)
+- [x] Configuración NetBeans y dependencias JAR
 - [x] `ConexionOracle` con `config.properties` (conexión nueva por llamada)
+- [x] `config.properties` + `config.properties.example` (el primero en `.gitignore`)
 - [x] `Main` con prueba de conexión (`probarConexion()`)
 - [x] Diseño de las entidades del dominio a partir del documento de trabajo
+- [x] **Capa Model: 15 clases POJO** en `com.cooperativa.model`
+- [x] **Capa DAO: 15 clases** en `com.cooperativa.dao` (CRUD + operaciones por entidad)
+- [x] Transacciones probadas en `Main`: albarán completo con encabezado + detalles
+- [x] Prueba de `numero_talonario` duplicado (debe lanzar `SQLException`)
+- [x] `ProductoDAO.descontarStock` / `aumentarStock` para stock transaccional
+- [x] `SaldoDAO.obtenerActual` con patrón `ROWNUM` válido en Oracle 10g
 
-### 11.2 En progreso
+### 12.2 Pendiente
 
-- [ ] Capa Model: 15 clases POJO (compilar y subir a `feature/model`)
-
-### 11.3 Pendiente
-
-- [ ] Scripts SQL de creación de tablas, secuencias y datos de catálogos (`scripts/`)
-- [ ] Capa DAO (empezar por `PersonaDAO`, luego catálogos, cuentas, productos, préstamos, albaranes)
-- [ ] Capa Controller con las reglas de la sección 8.5
-- [ ] Transacciones (albarán, préstamo de consumo, saldos)
-- [ ] Capa View (pantallas Swing)
-- [ ] Utils: PDF de albaranes y Hot Backup
+- [ ] **Scripts SQL**: la carpeta `scripts/` **no existe todavía**. Necesita tablas,
+      secuencias `seq_*`, PK/FK, y datos de catálogos. Los DAO ya definieron los nombres
+      de tabla y columna exactos (sección 8).
+- [ ] **Capa Controller** con las reglas de la sección 9.5
+- [ ] **Transacciones** en producción: apertura de cuenta (cuenta + titulares + saldo
+      inicial) y préstamo de consumo (encabezado + detalle + `descontarStock`)
+- [ ] **Capa View** (pantallas Swing) — las carpetas `controller/`, `view/`, `utils/` no existen
+- [ ] **Utils**: PDF de albaranes y Hot Backup
+- [ ] **Paginación** y búsquedas de texto en los DAO
 - [ ] Migración / pruebas con PostgreSQL (Fase IV)
-- [ ] Pruebas y validaciones de datos
+- [ ] Pruebas automatizadas y validaciones de datos
+
+### 12.3 Estado de Git (verificado)
+
+- Rama actual: `main`. Los 15 DAO están **sin commitear** (`??` en `git status`).
+- `Main.java` tiene cambios locales sin commitear (`M`).
+- Solo existe `main`; **no hay todavía ramas `feature/`**.
+- Último commit: `7d33867 feat: integración de la clase PersonaDAO`.
 
 ---
 
-## 12. Dudas abiertas (confirmar con el equipo)
+## 13. Dudas abiertas (confirmar con el equipo)
 
 1. `Albarán` y las entregas por talonario aparecen en la descripción del negocio pero no
    en la lista de entidades del documento. Se incluyeron; confirmar que BD y documentación
@@ -475,7 +710,7 @@ git push -u origin feature/nombre-de-la-tarea
 
 ---
 
-## 13. Instrucciones para agentes de IA
+## 14. Instrucciones para agentes de IA
 
 - Responder y comentar el código **en español**.
 - Código compatible con **Java 8**; respetar la estructura de paquetes de la sección 2.
@@ -484,12 +719,17 @@ git push -u origin feature/nombre-de-la-tarea
 - Todo SQL con `PreparedStatement` y recursos cerrados con try-with-resources.
 - No subir credenciales ni modificar `nbproject/project.properties` con rutas absolutas.
 - No cambiar nombres o tipos de las clases `model` sin avisar: BD y vista dependen de ellas.
-- Actualizar este archivo (sección 11 y sección 14) cuando cambie la arquitectura,
+- Los 15 DAO de la sección 8 ya están implementados: **no reescribirlos desde cero.**
+  Para extender un DAO, copiar el patrón existente (`COLUMNAS`, `siguienteId` con
+  `seq_<tabla>`, sobrecarga con `Connection`, `mapear`).
+- Para escribir SQL nuevo, respetar lo que los DAO ya exigen: nombres de tabla en
+  `snake_case` plural, secuencias `seq_<tabla>`, fechas de alta con `SYSDATE`.
+- Actualizar este archivo (sección 12 y sección 15) cuando cambie la arquitectura,
   las dependencias o las convenciones.
 
 ---
 
-## 14. Historial de Cambios
+## 15. Historial de Cambios
 
 | Fecha      | Cambio                                                                                             | Autor     |
 | ---------- | -------------------------------------------------------------------------------------------------- | --------- |
@@ -499,6 +739,13 @@ git push -u origin feature/nombre-de-la-tarea
 | 2026-10-01 | `ConexionOracle` lee credenciales de `config.properties`; sin conexión estática                    | Agente IA |
 | 2026-10-01 | Entidades rediseñadas según el documento de trabajo (15 clases, catálogos); se elimina `Hortaliza` | Agente IA |
 | 2026-10-01 | Añadidos Controller, mapeo Oracle, reglas de negocio, flujo Git y dudas abiertas                   | Agente IA |
+| 2026-10-01 | Estado real verificado contra el código: 15 model y 15 DAO implementados                           | Agente IA |
+| 2026-10-01 | Nueva sección 8 con los 15 DAO, sus métodos propios y los 8 patrones que siguen                    | Agente IA |
+| 2026-10-01 | Nueva sección 3.3 con la justificación de por qué model y dao van primero                          | Agente IA |
+| 2026-10-01 | Documentada la lógica de negocio en `model` (`calcularTotal`, `getSubtotal`)                       | Agente IA |
+| 2026-10-01 | Marcado que `scripts/` no existe y que las carpetas `controller/`, `view/`, `utils/` faltan        | Agente IA |
+| 2026-10-01 | Advertido que `nbproject/project.properties` real aún tiene `javac.source=26` y rutas absolutas    | Agente IA |
+| 2026-10-01 | Registrado el estado de Git: 15 DAO sin commitear, sin ramas `feature/`                            | Agente IA |
 
 ---
 
