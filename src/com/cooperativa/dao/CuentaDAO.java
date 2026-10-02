@@ -155,4 +155,18 @@ public class CuentaDAO {
         c.setFechaApertura(rs.getTimestamp("fecha_apertura"));
         return c;
     }
+    
+        /**
+     * Bloquea la fila de la cuenta hasta el commit/rollback de la transacción.
+     * Evita que dos operaciones simultáneas lean el mismo saldo.
+     */
+    public void bloquear(int cuentaId, Connection conn) throws SQLException {
+        String sql = "SELECT id FROM cuentas WHERE id = ? FOR UPDATE";
+        try (PreparedStatement ps = conn.prepareStatement(sql);) {
+            ps.setInt(1, cuentaId);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+            }
+        }
+    }
 }

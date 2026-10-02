@@ -1,18 +1,27 @@
 package com.cooperativa.main;
 
 import com.cooperativa.config.ConexionOracle;
-import com.cooperativa.dao.AlbaranDAO;
-import com.cooperativa.dao.DetalleAlbaranDAO;
-import com.cooperativa.dao.PersonaDAO;
+import com.cooperativa.controller.AlbaranController;
+import com.cooperativa.controller.Catalogos;
+import com.cooperativa.controller.CuentaController;
+import com.cooperativa.controller.NegocioException;
+import com.cooperativa.controller.PersonaController;
+import com.cooperativa.controller.PrestamoController;
 import com.cooperativa.dao.ProductoDAO;
+import com.cooperativa.dao.SedeDAO;
+import com.cooperativa.dao.TipoCuentaDAO;
 import com.cooperativa.model.Albaran;
+import com.cooperativa.model.Cuenta;
+import com.cooperativa.model.CuentaPersona;
 import com.cooperativa.model.DetalleAlbaran;
+import com.cooperativa.model.DetallePrestamo;
 import com.cooperativa.model.Persona;
+import com.cooperativa.model.Prestamo;
 import com.cooperativa.model.Producto;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 public class Main {
@@ -24,90 +33,155 @@ public class Main {
         System.out.println("Conexión exitosa a Oracle");
 
         try {
-            probarAlbaranes();
+            Persona socio = probarPersonas();
+            probarCuentas(socio);
+            probarPrestamos(socio);
+            probarAlbaranes(socio);
+        } catch (NegocioException e) {
+            System.out.println("Error de negocio inesperado: " + e.getMessage());
         } catch (SQLException e) {
             System.err.println("Error SQL: " + e.getMessage());
         }
     }
 
-    private static void probarAlbaranes() throws SQLException {
-        List<Persona> personas = new PersonaDAO().obtenerTodos();
-        List<Producto> productos = new ProductoDAO().obtenerTodos();
-        if (personas.isEmpty() || productos.isEmpty()) {
-            System.out.println("Faltan personas o productos para la prueba.");
-            return;
-        }
-        Persona socio = personas.get(0);
-        AlbaranDAO albaranDAO = new AlbaranDAO();
+    // ---------- Personas ----------
 
-        // 1) Entrega válida
-        String talonario = "TAL-" + (System.currentTimeMillis() % 100000000L);
-        Albaran a = nuevoAlbaran(talonario, socio, productos);
-        registrarAlbaran(a);
-        System.out.println("Albarán " + a.getId() + " registrado, talonario " + talonario);
+    private static Persona probarPersonas() throws NegocioException, SQLException {
+        System.out.println("\n=== PERSONAS ===");
+        PersonaController pc = new PersonaController();
 
-        Albaran guardado = albaranDAO.obtenerPorIdConDetalles(a.getId());
-        BigDecimal rechazado = BigDecimal.ZERO;
-        for (DetalleAlbaran d : guardado.getDetalles()) {
-            System.out.println("  Producto " + d.getProductoId()
-                + " | aceptado " + d.getCantidadAceptada()
-                + " | rechazado " + d.getCantidadRechazada()
-                + " | precio " + d.getPrecioUnitario()
-                + " | subtotal " + d.getSubtotal().setScale(2, RoundingMode.HALF_UP));
-            rechazado = rechazado.add(d.getCantidadRechazada());
-        }
-        System.out.println("Total a pagar al socio: "
-            + guardado.calcularTotal().setScale(2, RoundingMode.HALF_UP));
-        System.out.println("Total rechazado (kg): " + rechazado);
+        Persona p = new Persona();
+        p.setNombre("Marta");
+        p.setApellido("López");
+        p.setDni("T" + (System.currentTimeMillis() % 1000000000L));
+        p.setDireccion("Aldea El Roble");
+        p.setTelefono("55550000");
+        p.setTipoPersonaId(Catalogos.tipoPersonaId(Catalogos.TIPO_PERSONA_SOCIO));
+        p.setSedeId(new SedeDAO().obtenerTodos().get(0).getId());
 
-        // 2) Mismo talonario otra vez: debe rechazarse y no dejar nada
-        int antes = albaranDAO.obtenerPorPersona(socio.getId()).size();
+        pc.registrar(p);   // sin estatus: queda ACTIVO
+        System.out.println("Persona registrada con id " + p.getId() + " (" + p + ")");
+
         try {
-            registrarAlbaran(nuevoAlbaran(talonario, socio, productos));
-        } catch (SQLException e) {
+            pc.registrar(p);   // mismo DNI
+        } catch (NegocioException e) {
             System.out.println("Rechazado: " + e.getMessage());
         }
-        int despues = albaranDAO.obtenerPorPersona(socio.getId()).size();
-        System.out.println("Albaranes de " + socio + " antes: " + antes
-            + " | después: " + despues + " (deben ser iguales)");
+
+        try {
+            pc.registrar(new Persona());   // sin datos
+        } catch (NegocioException e) {
+            System.out.println("Rechazado: " + e.getMessage());
+        }
+        return p;
+    }
+
+    // ---------- Cuentas ----------
+
+    private static void probarCuentas(Persona socio) throws NegocioException, SQLException {
+        System.out.println("\n=== CUENTAS ===");
+        CuentaController cc = new CuentaController();
+
+        Cuenta cuenta = new Cuenta();
+        cuenta.setTipoCuentaId(new TipoCuentaDAO().obtenerTodos().get(0).getId());
+        cuenta.setSedeId(socio.getSedeId());
+
+        List<CuentaPersona> personas = new ArrayList<CuentaPersona>();
+        personas.add(new CuentaPersona(0, socio.getId(), true));
+
+        cc.abrirCuenta(cuenta, personas, new BigDecimal("200.00"));
+        System.out.println("Cuenta " + cuenta.getNumero() + " abierta con saldo "
+            + cc.consultarSaldo(cuenta.getId()));
+
+        System.out.println("Saldo tras depositar 50.25: " + cc.depositar(cuenta.getId(), new BigDecimal("50.25")));
+
+        try {
+            cc.retirar(cuenta.getId(), new BigDecimal("1000"));
+        } catch (NegocioException e) {
+            System.out.println("Rechazado: " + e.getMessage());
+        }
+
+        System.out.println("Saldo tras retirar 30.00: " + cc.retirar(cuenta.getId(), new BigDecimal("30.00")));
+
+        // Una cuenta sin titular no se puede abrir
+        List<CuentaPersona> sinTitular = new ArrayList<CuentaPersona>();
+        sinTitular.add(new CuentaPersona(0, socio.getId(), false));
+        try {
+            cc.abrirCuenta(new Cuenta(), sinTitular, null);
+        } catch (NegocioException e) {
+            System.out.println("Rechazado: " + e.getMessage());
+        }
+    }
+
+    // ---------- Préstamos ----------
+
+    private static void probarPrestamos(Persona socio) throws NegocioException, SQLException {
+        System.out.println("\n=== PRÉSTAMOS ===");
+        PrestamoController prc = new PrestamoController();
+        PersonaController pc = new PersonaController();
+        Producto producto = new ProductoDAO().obtenerTodos().get(0);
+        int tipoConsumo = Catalogos.tipoPrestamoId(Catalogos.TIPO_PRESTAMO_CONSUMO);
+
+        Prestamo p = nuevoPrestamoConsumo(socio, tipoConsumo, producto, 3);
+        prc.registrarPrestamo(p);
+        System.out.println("Préstamo " + p.getId() + " registrado por " + p.getMonto());
+
+        try {
+            prc.registrarPrestamo(nuevoPrestamoConsumo(socio, tipoConsumo, producto, 1000000));
+        } catch (NegocioException e) {
+            System.out.println("Rechazado: " + e.getMessage());
+        }
+
+        // Persona inactiva: no puede recibir préstamos
+        pc.desactivar(socio.getId());
+        try {
+            prc.registrarPrestamo(nuevoPrestamoConsumo(socio, tipoConsumo, producto, 1));
+        } catch (NegocioException e) {
+            System.out.println("Rechazado: " + e.getMessage());
+        }
+        pc.activar(socio.getId());
+    }
+
+    private static Prestamo nuevoPrestamoConsumo(Persona socio, int tipoId, Producto producto, int cantidad) {
+        Prestamo p = new Prestamo();
+        p.setPersonaId(socio.getId());
+        p.setTipoPrestamoId(tipoId);
+        p.setTasaInteres(new BigDecimal("5.00"));
+
+        Calendar vence = Calendar.getInstance();
+        vence.add(Calendar.DAY_OF_YEAR, 180);
+        p.setFechaVencimiento(vence.getTime());
+
+        p.agregarDetalle(new DetallePrestamo(producto.getId(), cantidad, producto.getPrecio()));
+        return p;
+    }
+
+    // ---------- Albaranes ----------
+
+    private static void probarAlbaranes(Persona socio) throws NegocioException, SQLException {
+        System.out.println("\n=== ALBARANES ===");
+        AlbaranController ac = new AlbaranController();
+        List<Producto> productos = new ProductoDAO().obtenerTodos();
+
+        String talonario = "TAL-" + (System.currentTimeMillis() % 100000000L);
+        Albaran a = nuevoAlbaran(talonario, socio, productos);
+        ac.registrarEntrega(a);
+        System.out.println("Albarán " + a.getId() + " registrado. Total a pagar: " + ac.totalAPagar(a));
+
+        try {
+            ac.registrarEntrega(nuevoAlbaran(talonario, socio, productos));   // mismo talonario
+        } catch (NegocioException e) {
+            System.out.println("Rechazado: " + e.getMessage());
+        }
     }
 
     private static Albaran nuevoAlbaran(String talonario, Persona socio, List<Producto> productos) {
         Albaran a = new Albaran();
         a.setNumeroTalonario(talonario);
-        a.setPersonaId(socio.getId());
-        a.setSedeId(socio.getSedeId());
+        a.setPersonaId(socio.getId());   // la sede se toma del socio
 
-        // Línea 1: 80.50 kg aceptados, 4.25 kg rechazados, a 3.75 por kg
         a.agregarDetalle(new DetalleAlbaran(productos.get(0).getId(),
             new BigDecimal("80.50"), new BigDecimal("4.25"), new BigDecimal("3.75")));
-
-        // Línea 2 (si hay un segundo producto): 40.00 kg aceptados, 0 rechazados, a 2.10 por kg
-        if (productos.size() > 1) {
-            a.agregarDetalle(new DetalleAlbaran(productos.get(1).getId(),
-                new BigDecimal("40.00"), BigDecimal.ZERO, new BigDecimal("2.10")));
-        }
         return a;
-    }
-
-    /** Transacción: encabezado del albarán + todas sus líneas, o nada. */
-    private static void registrarAlbaran(Albaran a) throws SQLException {
-        AlbaranDAO albaranDAO = new AlbaranDAO();
-        DetalleAlbaranDAO detalleDAO = new DetalleAlbaranDAO();
-
-        try (Connection conn = ConexionOracle.getConexion()) {
-            conn.setAutoCommit(false);
-            try {
-                albaranDAO.guardar(a, conn);
-                for (DetalleAlbaran d : a.getDetalles()) {
-                    d.setAlbaranId(a.getId());
-                    detalleDAO.guardar(d, conn);
-                }
-                conn.commit();
-            } catch (SQLException e) {
-                conn.rollback();
-                throw e;
-            }
-        }
     }
 }
