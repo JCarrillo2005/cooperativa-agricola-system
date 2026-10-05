@@ -32,7 +32,7 @@ SistemaCooperativaAgricola/
  │         ├── config/       # Clases de conexión JDBC (Oracle 10g y PostgreSQL)
  │         ├── dao/          # Data Access Object (Lógica CRUD y transacciones SQL)
  │         ├── model/        # Entidades POJO (Persona, Cuenta, Prestamo, Producto, etc.)
- │         ├── utils/        # Generador de reportes/albaranes en PDF y módulo Hot Backup
+ │         ├── utils/        # Migración, respaldo en caliente y recuperación
  │         ├── view/         # Interfaces gráficas de usuario (JFrames / Swing)
  │         └── main/         # Clase principal de ejecución
  ├── lib/                    # Driver JDBC (ojdbc14.jar / postgresql.jar)
@@ -60,3 +60,7 @@ JDK 8 instalado y configurado en las variables de entorno (JAVA_HOME).
 Instancia funcional de Oracle Database 10g escuchando en el puerto 1521 (SID: XE u ORCL).
 
 Instancia de PostgreSQL para la ejecución de pruebas de migración y backups en caliente (Fase IV).
+
+La instalación de la base de datos, los scripts oficiales de las 15 tablas,
+las pruebas de integridad y los comandos de migración/respaldo y recuperación
+están en [scripts/README_BD.md](scripts/README_BD.md).

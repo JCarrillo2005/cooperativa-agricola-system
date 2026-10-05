@@ -1,7 +1,7 @@
 # AGENTS.MD — Sistema de Gestión Integral · Cooperativa Agrícola
 
 > **Documento de contexto técnico y arquitectura** para desarrolladores y agentes de IA.
-> Última actualización: 2026-10-01
+> Última actualización: 2026-10-04
 
 ---
 
@@ -97,19 +97,20 @@ SistemaCooperativaAgricola/
 │   └── com/cooperativa/
 │       ├── config/
 │       │   ├── ConexionOracle.java      # Pool de conexiones a Oracle
-│       │   └── ConexionPostgres.java    # (pendiente, Fase IV)
+│       │   └── ConexionPostgres.java    # Conexión y prueba JDBC PostgreSQL
 │       ├── model/                       # Entidades POJO (15 clases)
 │       ├── dao/                         # Data Access Objects (15 clases)
 │       ├── controller/                  # Reglas de negocio (5 controllers + 2 utilitarias)
 │       ├── utils/
-│       │   └── BackupEnCaliente.java    # (pendiente, Fase IV)
+│       │   ├── BackupEnCaliente.java    # Copia consistente y recuperación
+│       │   └── EsquemaRespaldo.java     # Contrato de las 15 tablas para copia JDBC
 │       ├── view/                        # (pendiente) Interfaces Swing
 │       └── main/
 │           └── Main.java                # Hoy: arnés de pruebas manual
 ├── lib/
 │   ├── ojdbc14.jar
 │   └── postgresql-42.7.13.jar
-├── scripts/                             # (pendiente) DDL/DML Oracle y PostgreSQL
+├── scripts/                             # DDL/DML, limpieza, verificación y README_BD
 ├── nbproject/                           # Configuración NetBeans (private/ se ignora)
 ├── build.xml
 ├── manifest.mf
@@ -120,7 +121,7 @@ SistemaCooperativaAgricola/
 ```
 
 > **Estado real de las carpetas:** existen `config/`, `model/`, `dao/`, `controller/` y `main/`.
-> `view/`, `utils/` y `scripts/` **todavía no están creadas**.
+> `utils/` y `scripts/` están implementadas; `view/` sigue pendiente.
 
 ---
 
@@ -145,12 +146,12 @@ UTILS (BackupEnCaliente)  →  lee Oracle por JDBC  →  escribe en PostgreSQL  
 
 | Capa           | Paquete                      | Responsabilidad                   | Estado                              |
 | -------------- | ---------------------------- | --------------------------------- | ----------------------------------- |
-| **Config**     | `com.cooperativa.config`     | Pool de conexiones JDBC           | ✅ Oracle · ❌ PostgreSQL pendiente |
+| **Config**     | `com.cooperativa.config`     | Conexiones JDBC                   | ✅ Oracle (pool) y PostgreSQL |
 | **Model**      | `com.cooperativa.model`      | 15 entidades POJO                 | ✅ Implementada                     |
 | **DAO**        | `com.cooperativa.dao`        | CRUD y operaciones por entidad    | ✅ Implementada (15 DAOs)           |
 | **Controller** | `com.cooperativa.controller` | Reglas de negocio y transacciones | ✅ Implementada y probada           |
 | **View**       | `com.cooperativa.view`       | Pantallas Swing                   | ❌ No existe aún                    |
-| **Utils**      | `com.cooperativa.utils`      | Backup en caliente a PostgreSQL   | ❌ No existe aún                    |
+| **Utils**      | `com.cooperativa.utils`      | Backup en caliente y recuperación | Implementado y validado con Oracle 10g XE/PostgreSQL locales |
 | **Main**       | `com.cooperativa.main`       | Arnés de pruebas manual           | ✅ (temporal)                       |
 
 ### 3.3 Por qué se implementaron `model` y `dao` primero
@@ -191,7 +192,7 @@ src.dir=src
 test.src.dir=test
 ```
 
-> ⚠️ **Verificar el archivo real.** En la última revisión (2026-10-01) el
+> **Incidencia histórica, corregida el 2026-10-04.** En la revisión del 2026-10-01 el
 > `nbproject/project.properties` contenía valores que **no** coinciden con el bloque de arriba:
 >
 > ```properties
@@ -201,9 +202,8 @@ test.src.dir=test
 > file.reference.postgresql-42.7.13.jar=C:\\Users\\Julio Cesar\\Downloads\\postgresql-42.7.13.jar
 > ```
 >
-> Los valores del bloque son la **configuración objetivo**. Con las rutas absolutas el
-> proyecto compila en la máquina de Julio, pero **rompe al clonar el repo** en cualquier
-> otra. Corregir antes de volver a hacer commit.
+> Hoy las rutas de ambos JAR son relativas y source/target son 1.8. Mantener esta
+> configuración: las rutas personales rompen la compilación de los demás integrantes.
 
 ### 4.2 Reglas importantes
 
@@ -242,7 +242,7 @@ db.password=TU_CONTRASENA
 | URL                | `jdbc:oracle:thin:@localhost:1521:XE` |
 | Driver             | `oracle.jdbc.driver.OracleDriver`     |
 
-Para la Fase IV se agregarán al mismo archivo las claves `pg.url`, `pg.user` y `pg.password`
+Para la Fase IV se agregaron a la plantilla las claves `pg.url`, `pg.user` y `pg.password`
 (PostgreSQL: driver `org.postgresql.Driver`, JAR `postgresql-42.7.13.jar`, puerto `5432`).
 
 **Todo el equipo debe usar el mismo usuario/esquema de Oracle**, para que las tablas y
@@ -729,14 +729,16 @@ public Sede obtenerPorId(int id) throws SQLException {
 
 ## 11. Fase IV: migración y backup en caliente a PostgreSQL
 
-> **Estado: diseño propuesto, no implementado.** PostgreSQL aún no está instalado en la
-> máquina de Julio.
+> **Estado: implementado y validado en Java 8, Oracle XE 10.2.0.1.0 y PostgreSQL 16.15.**
+> Se comprobó copia real con escritor concurrente y recuperación completa a un esquema
+> nuevo, incluidas las secuencias. Evidencia: `scripts/VALIDACION_BD.md`.
+> Cada integrante configura su propia instalación según `scripts/README_BD.md`.
 
 El enunciado pide migrar a una base open source y mantener un backup en caliente con
 PostgreSQL. Un solo módulo cubre ambas cosas: la **migración** es una copia completa de una vez,
 y el **backup en caliente** es la misma copia repetida mientras la aplicación sigue en uso.
 
-**Piezas planeadas**
+**Piezas implementadas**
 
 - `config/ConexionPostgres.java`: fábrica de conexiones a PostgreSQL (claves `pg.url`,
   `pg.user`, `pg.password` en `config.properties`; base `cooperativa_respaldo`).
@@ -753,6 +755,19 @@ y el **backup en caliente** es la misma copia repetida mientras la aplicación s
    `cuentas_personas`, `saldos`, `prestamos`, `detalles_prestamo`, `albaranes`, `detalles_albaran`.
 4. En cada respaldo vacía las tablas destino y las vuelve a llenar (versión incremental = mejora futura).
 5. **Verifica** comparando el conteo de filas de cada tabla entre Oracle y PostgreSQL.
+
+El destino es una base exclusiva de respaldo. La copia usa `DELETE` de hijos a padres,
+mantiene las FK activas, bloquea escrituras del destino y serializa respaldos/recuperaciones
+con un advisory lock. Alinea las secuencias PostgreSQL mediante `ALTER SEQUENCE RESTART`
+en la misma transacción; un fallo anterior al commit conserva la copia anterior.
+
+CLI desde la raíz tras compilar: `com.cooperativa.config.ConexionPostgres` prueba la conexión;
+`com.cooperativa.utils.BackupEnCaliente respaldar` copia Oracle a PostgreSQL;
+`recuperar ruta-ajuste.sql` carga un esquema Oracle propio, nuevo y vacío desde PostgreSQL.
+La recuperación usa `restore.oracle.url`, `restore.oracle.user` y `restore.oracle.password`
+en la plantilla local. El ajuste de secuencias Oracle se genera como SQL y se aplica después
+del commit de datos con la aplicación detenida, porque el DDL Oracle confirma implícitamente.
+Conservar archivos históricos mediante `pg_dump` fuera de Git. No hay failover automático.
 
 **Equivalencia de tipos**
 
@@ -837,14 +852,17 @@ El estado de ramas y commits cambia a diario: consultarlo con `git status`, `git
 
 ### 14.2 Pendiente
 
-- [ ] **Scripts SQL consolidados** (Oracle y PostgreSQL) en `scripts/`: tablas, secuencias, PK/FK,
-      datos de catálogo (incluyendo los nombres de la sección 9.3). La carpeta no existe todavía.
-- [ ] **Fase IV (requisito del curso):** instalar PostgreSQL, `ConexionPostgres`, `BackupEnCaliente`
-      y una prueba que compare los conteos de cada tabla.
+- [x] **Scripts SQL consolidados**: 15 tablas, 14 secuencias, PK/FK y datos ficticios,
+      con verificación SQL negativa en ambos motores y `scripts/README_BD.md`.
+- [x] **Fase IV: implementación** de `ConexionPostgres`, `BackupEnCaliente`, copia por lotes,
+      conteos y recuperación a un esquema Oracle vacío.
+- [x] **Fase IV: integración local real**: Oracle/PostgreSQL, copia con escritura concurrente
+      por JDBC y recuperación completa con secuencias. Instalación y prueba de pantallas
+      en las máquinas del equipo quedan a cargo de cada integrante.
 - [ ] **Capa View** (pantallas Swing, Jorge).
 - [ ] Ajustes del backend para la vista: consultas con nombres resueltos (JOIN), búsquedas por
       texto, paginación y controller de catálogos.
-- [ ] Corregir `nbproject/project.properties` (sección 4.1).
+- [x] Corregir `nbproject/project.properties`: source/target 1.8 y JAR con rutas relativas.
 - [ ] Crear un esquema propio de Oracle para la entrega y limpiar los datos de prueba.
 - [ ] Reemplazar `Main` (hoy arnés de pruebas manual; la última prueba cubre `ProductoController`)
       por la entrada real de la aplicación cuando exista la vista.
@@ -926,6 +944,7 @@ código y pool de conexiones.
 
 | Fecha      | Cambio                                                                                             | Autor     |
 | ---------- | -------------------------------------------------------------------------------------------------- | --------- |
+| 2026-10-04 | Scripts y guía, conexión JDBC y respaldo/recuperación Java 8; validación real Oracle 10g XE/PostgreSQL, 73 rechazos de integridad por motor, copia concurrente y secuencias recuperadas | Codex |
 | 2026-10-01 | Creación inicial del documento AGENTS.MD                                                           | Agente IA |
 | 2026-10-01 | Fijado `javac.source/target=1.8` por compatibilidad con `ojdbc14.jar`                              | Agente IA |
 | 2026-10-01 | Rutas de JAR relativas a `lib/`                                                                    | Agente IA |
