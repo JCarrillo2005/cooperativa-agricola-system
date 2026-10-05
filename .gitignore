@@ -3,3 +3,7 @@ dist/
 nbproject/private/
 *.class
 config.properties
+backups/
+*.dmp
+*.dump
+*.log
