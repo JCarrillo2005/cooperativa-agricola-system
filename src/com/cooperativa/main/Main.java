@@ -1,5 +1,6 @@
 package com.cooperativa.main;
 
+import com.cooperativa.view.VentanaPrincipal;
 import com.cooperativa.config.ConexionOracle;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -38,13 +39,14 @@ public class Main {
                 // frm.setLocationRelativeTo(null); // Centrar en pantalla
                 // frm.setVisible(true);
 
-                JOptionPane.showMessageDialog(
-                    null,
-                    "¡Backend, Controllers y Base de Datos listos!\n"
-                    + "Esperando la implementación de la Vista (Swing) por Jorge.",
-                    "Sistema de Cooperativa Agrícola",
-                    JOptionPane.INFORMATION_MESSAGE
-                );
+                // Reemplaza las líneas del JOptionPane final por esto:
+                java.awt.EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        new VentanaPrincipal().setVisible(true);
+                    }
+                });
+                
+                
             }
         });
     }
