@@ -133,6 +133,39 @@ public class PrestamoController {
         }
     }
 
+    /**
+     * Cierre de ciclo operacional: Registra un abono parcial o liquidación total al préstamo.
+     * Descuenta el monto abonado de la deuda pendiente. Si el saldo restante llega a 0,
+     * cambia automáticamente el estatus del préstamo a PAGADO.
+     * Devuelve el saldo restante pendiente.
+     */
+    public BigDecimal registrarAbono(int prestamoId, BigDecimal montoAbono) throws NegocioException {
+        if (montoAbono == null || montoAbono.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new NegocioException("El monto del abono debe ser mayor que cero.");
+        }
+        Prestamo p = obtener(prestamoId);
+        if (p.getMonto().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new NegocioException("El préstamo no posee saldo pendiente por pagar.");
+        }
+        if (montoAbono.compareTo(p.getMonto()) > 0) {
+            throw new NegocioException("El abono (Q" + montoAbono.setScale(2, RoundingMode.HALF_UP)
+                + ") no puede superar el saldo pendiente actual (Q" + p.getMonto() + ").");
+        }
+
+        BigDecimal nuevoSaldo = p.getMonto().subtract(montoAbono).setScale(2, RoundingMode.HALF_UP);
+        p.setMonto(nuevoSaldo);
+
+        try {
+            if (nuevoSaldo.compareTo(BigDecimal.ZERO) == 0) {
+                p.setEstatusId(Catalogos.estatusId("PAGADO"));
+            }
+            prestamoDAO.actualizar(p);
+            return nuevoSaldo;
+        } catch (SQLException e) {
+            throw NegocioException.deSQL("No se pudo registrar el abono al préstamo", e);
+        }
+    }
+
     // ---------- Consultas ----------
 
     /** Préstamo con sus productos (si es de consumo). */

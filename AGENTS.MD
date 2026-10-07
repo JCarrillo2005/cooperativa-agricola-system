@@ -150,7 +150,7 @@ UTILS (BackupEnCaliente)  →  lee Oracle por JDBC  →  escribe en PostgreSQL  
 | **Model**      | `com.cooperativa.model`      | 15 entidades POJO                 | ✅ Implementada                     |
 | **DAO**        | `com.cooperativa.dao`        | CRUD y operaciones por entidad    | ✅ Implementada (15 DAOs)           |
 | **Controller** | `com.cooperativa.controller` | Reglas de negocio y transacciones | ✅ Implementada y probada           |
-| **View**       | `com.cooperativa.view`       | Pantallas Swing                   | ❌ No existe aún                    |
+| **View**       | `com.cooperativa.view`       | Pantallas Swing (5 módulos)       | ✅ Implementada                     |
 | **Utils**      | `com.cooperativa.utils`      | Backup en caliente y recuperación | Implementado y validado con Oracle 10g XE/PostgreSQL locales |
 | **Main**       | `com.cooperativa.main`       | Arnés de pruebas manual           | ✅ (temporal)                       |
 
@@ -859,13 +859,12 @@ El estado de ramas y commits cambia a diario: consultarlo con `git status`, `git
 - [x] **Fase IV: integración local real**: Oracle/PostgreSQL, copia con escritura concurrente
       por JDBC y recuperación completa con secuencias. Instalación y prueba de pantallas
       en las máquinas del equipo quedan a cargo de cada integrante.
-- [ ] **Capa View** (pantallas Swing, Jorge).
-- [ ] Ajustes del backend para la vista: consultas con nombres resueltos (JOIN), búsquedas por
-      texto, paginación y controller de catálogos.
+- [x] **Capa View** (pantallas Swing: PanelPersonas, PanelProductos, PanelCuentas, PanelPrestamos, PanelAlbaranes integradas en VentanaPrincipal).
+- [x] **CatalogosController**: servicios de catálogos para combos de la vista (sedes, tipos de cuenta, tipos de persona, tipos de préstamo, categorías, estatus).
+- [x] **Cierre de ciclo operacional**: abono directo de albaranes en cuenta de ahorro del socio (liquidarAlbaranEnCuenta) y abonos a préstamos (registrarAbono).
 - [x] Corregir `nbproject/project.properties`: source/target 1.8 y JAR con rutas relativas.
 - [ ] Crear un esquema propio de Oracle para la entrega y limpiar los datos de prueba.
-- [ ] Reemplazar `Main` (hoy arnés de pruebas manual; la última prueba cubre `ProductoController`)
-      por la entrada real de la aplicación cuando exista la vista.
+- [x] Entrada de aplicación en `Main`: verificación de conectividad y despliegue de `VentanaPrincipal`.
 - [ ] Documentación del curso (Fases I a III, exposición): aporte del backend en la sección 16.
 
 ---
@@ -944,6 +943,7 @@ código y pool de conexiones.
 
 | Fecha      | Cambio                                                                                             | Autor     |
 | ---------- | -------------------------------------------------------------------------------------------------- | --------- |
+| 2026-10-07 | Actualización de README.md con matriz de cumplimiento de entidades, diagnóstico de faltantes y GUI | Antigravity |
 | 2026-10-04 | Scripts y guía, conexión JDBC y respaldo/recuperación Java 8; validación real Oracle 10g XE/PostgreSQL, 73 rechazos de integridad por motor, copia concurrente y secuencias recuperadas | Codex |
 | 2026-10-01 | Creación inicial del documento AGENTS.MD                                                           | Agente IA |
 | 2026-10-01 | Fijado `javac.source/target=1.8` por compatibilidad con `ojdbc14.jar`                              | Agente IA |

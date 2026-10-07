@@ -126,6 +126,21 @@ public class AlbaranController {
         return a.calcularTotal().setScale(2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * Cierre de ciclo operacional: Liquida el total aceptado del albarán acreditándolo
+     * directamente como depósito a una cuenta bancaria del socio.
+     */
+    public BigDecimal liquidarAlbaranEnCuenta(int albaranId, int cuentaId) throws NegocioException {
+        Albaran a = obtener(albaranId);
+        BigDecimal total = totalAPagar(a);
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new NegocioException("El albarán no posee producto aceptado para liquidar (total Q0.00).");
+        }
+        CuentaController cuentaController = new CuentaController();
+        cuentaController.depositar(cuentaId, total);
+        return total;
+    }
+
     // ---------- Consultas ----------
 
     /** Albarán con sus líneas. */
