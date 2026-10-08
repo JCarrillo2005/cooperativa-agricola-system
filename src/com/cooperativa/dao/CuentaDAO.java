@@ -18,11 +18,22 @@ public class CuentaDAO {
 
     public boolean guardar(Cuenta c) throws SQLException {
         try (Connection conn = ConexionOracle.getConexion()) {
-            return guardar(c, conn);
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean resultado = guardar(c, conn);
+                conn.commit();
+                return resultado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
-    /** Para usar dentro de una transacción (cuenta + titulares + saldo inicial). */
+    /** Para usar dentro de una transacción externa (cuenta + titulares + saldo inicial). */
     public boolean guardar(Cuenta c, Connection conn) throws SQLException {
         c.setId(siguienteId(conn));
         String sql = "INSERT INTO cuentas (" + COLUMNAS + ") VALUES (?, ?, ?, ?, ?, SYSDATE)";
@@ -39,8 +50,10 @@ public class CuentaDAO {
     private int siguienteId(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement("SELECT seq_cuentas.NEXTVAL FROM dual");
              ResultSet rs = ps.executeQuery()) {
-            rs.next();
-            return rs.getInt(1);
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+            throw new SQLException("No se pudo obtener el siguiente ID de la secuencia seq_cuentas.");
         }
     }
 
@@ -87,7 +100,6 @@ public class CuentaDAO {
         return lista;
     }
 
-    /** Todas las cuentas en las que participa una persona (titular o no). */
     public List<Cuenta> obtenerPorPersona(int personaId) throws SQLException {
         List<Cuenta> lista = new ArrayList<Cuenta>();
         String sql = "SELECT c.id, c.numero, c.tipo_cuenta_id, c.estatus_id, c.sede_id, c.fecha_apertura "
@@ -110,36 +122,74 @@ public class CuentaDAO {
     public boolean actualizar(Cuenta c) throws SQLException {
         String sql = "UPDATE cuentas SET numero = ?, tipo_cuenta_id = ?, estatus_id = ?, "
                    + "sede_id = ? WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, c.getNumero());
-            ps.setInt(2, c.getTipoCuentaId());
-            ps.setInt(3, c.getEstatusId());
-            ps.setInt(4, c.getSedeId());
-            ps.setInt(5, c.getId());
-            return ps.executeUpdate() == 1;
+        try (Connection conn = ConexionOracle.getConexion()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean actualizado;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, c.getNumero());
+                    ps.setInt(2, c.getTipoCuentaId());
+                    ps.setInt(3, c.getEstatusId());
+                    ps.setInt(4, c.getSedeId());
+                    ps.setInt(5, c.getId());
+                    actualizado = ps.executeUpdate() == 1;
+                }
+                conn.commit();
+                return actualizado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
     public boolean cambiarEstatus(int cuentaId, int estatusId) throws SQLException {
         String sql = "UPDATE cuentas SET estatus_id = ? WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, estatusId);
-            ps.setInt(2, cuentaId);
-            return ps.executeUpdate() == 1;
+        try (Connection conn = ConexionOracle.getConexion()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean cambiado;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, estatusId);
+                    ps.setInt(2, cuentaId);
+                    cambiado = ps.executeUpdate() == 1;
+                }
+                conn.commit();
+                return cambiado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
     // ---------- DELETE ----------
 
-    /** Falla (ORA-02292) si la cuenta ya tiene personas o saldos asociados. */
     public boolean eliminar(int id) throws SQLException {
         String sql = "DELETE FROM cuentas WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            return ps.executeUpdate() == 1;
+        try (Connection conn = ConexionOracle.getConexion()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean eliminado;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, id);
+                    eliminado = ps.executeUpdate() == 1;
+                }
+                conn.commit();
+                return eliminado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
@@ -156,13 +206,9 @@ public class CuentaDAO {
         return c;
     }
     
-        /**
-     * Bloquea la fila de la cuenta hasta el commit/rollback de la transacción.
-     * Evita que dos operaciones simultáneas lean el mismo saldo.
-     */
     public void bloquear(int cuentaId, Connection conn) throws SQLException {
         String sql = "SELECT id FROM cuentas WHERE id = ? FOR UPDATE";
-        try (PreparedStatement ps = conn.prepareStatement(sql);) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, cuentaId);
             try (ResultSet rs = ps.executeQuery()) {
                 rs.next();

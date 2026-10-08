@@ -26,6 +26,8 @@ import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import javax.swing.table.DefaultTableModel;
 
 /**
@@ -85,6 +87,14 @@ public class PanelProductos extends JPanel {
         pnlFormulario.add(new JLabel("Categoría:"), gbc);
         gbc.gridx = 3;
         cmbCategoria = new JComboBox<CategoriaProducto>();
+        cmbCategoria.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                cargarCategorias();
+            }
+            @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+            @Override public void popupMenuCanceled(PopupMenuEvent e) {}
+        });
         pnlFormulario.add(cmbCategoria, gbc);
 
         // Fila 1: Precio y Stock
@@ -174,8 +184,17 @@ public class PanelProductos extends JPanel {
 
     private void cargarCategorias() {
         try {
+            CategoriaProducto seleccionado = (CategoriaProducto) cmbCategoria.getSelectedItem();
             List<CategoriaProducto> categorias = catalogosController.listarCategoriasProducto();
             cmbCategoria.setModel(new DefaultComboBoxModel<CategoriaProducto>(categorias.toArray(new CategoriaProducto[0])));
+            if (seleccionado != null) {
+                for (int i = 0; i < cmbCategoria.getItemCount(); i++) {
+                    if (cmbCategoria.getItemAt(i).getId() == seleccionado.getId()) {
+                        cmbCategoria.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
         } catch (NegocioException ex) {
             JOptionPane.showMessageDialog(this, "Error cargando categorías: " + ex.getMessage(),
                 "Error", JOptionPane.ERROR_MESSAGE);
@@ -228,7 +247,7 @@ public class PanelProductos extends JPanel {
             String precioStr = modeloTabla.getValueAt(fila, 4).toString().replace("Q ", "").trim();
             txtPrecio.setText(precioStr);
             txtStock.setText(modeloTabla.getValueAt(fila, 5).toString());
-            txtStock.setEditable(false); // Solo se modifica stock al crear o mediante Reabastecer
+            txtStock.setEditable(false);
         }
     }
 
@@ -265,7 +284,6 @@ public class PanelProductos extends JPanel {
 
         try {
             if (productoSeleccionadoId == null) {
-                // Nuevo producto
                 Producto p = new Producto();
                 p.setNombre(nombre);
                 p.setDescripcion(desc);
@@ -276,7 +294,6 @@ public class PanelProductos extends JPanel {
                 JOptionPane.showMessageDialog(this, "Producto registrado correctamente (ID: " + p.getId() + ").",
                     "Éxito", JOptionPane.INFORMATION_MESSAGE);
             } else {
-                // Actualizar producto
                 Producto p = productoController.obtenerPorId(productoSeleccionadoId);
                 p.setNombre(nombre);
                 p.setDescripcion(desc);

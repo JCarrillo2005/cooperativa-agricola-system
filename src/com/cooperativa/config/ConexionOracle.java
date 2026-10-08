@@ -14,11 +14,6 @@ import java.util.Properties;
 
 /**
  * Fábrica de conexiones JDBC hacia Oracle 10g con un pool sencillo.
- *
- * - Las credenciales se leen de config.properties (raíz del proyecto, ignorado por Git).
- * - getConexion() entrega una conexión del pool; al hacer close() NO se cierra de verdad:
- *   se deshace lo que no se confirmó y vuelve al pool para reutilizarse.
- * - Se mantienen como máximo MAXIMO_CONEXIONES conexiones físicas abiertas.
  */
 public class ConexionOracle {
 
@@ -30,7 +25,7 @@ public class ConexionOracle {
 
     private static final Object LOCK = new Object();
     private static final LinkedList<Connection> libres = new LinkedList<Connection>();
-    private static int creadas = 0;   // conexiones físicas existentes (libres + en uso)
+    private static int creadas = 0;   
 
     private static String url;
     private static String usuario;
@@ -42,17 +37,15 @@ public class ConexionOracle {
             Class.forName(DRIVER);
         } catch (IOException e) {
             throw new ExceptionInInitializerError(
-                "No se pudo leer " + ARCHIVO_CONFIG + ". Copia config.properties.example "
-                + "como config.properties en la raiz del proyecto y ajusta tus datos. ("
-                + e.getMessage() + ")");
+                "No se pudo leer " + ARCHIVO_CONFIG + ". (" + e.getMessage() + ")");
         } catch (ClassNotFoundException e) {
             throw new ExceptionInInitializerError(
-                "No se encontro el driver de Oracle. Revisa que lib/ojdbc14.jar este en el classpath.");
+                "No se encontro el driver de Oracle. Revisa el classpath.");
         }
     }
 
     private ConexionOracle() {
-        // Clase utilitaria: no se instancia
+        // Clase utilitaria
     }
 
     private static void cargarConfiguracion() throws IOException {
@@ -65,22 +58,14 @@ public class ConexionOracle {
         password = props.getProperty("db.password");
 
         if (url == null || usuario == null || password == null) {
-            throw new IOException("Faltan db.url, db.user o db.password en " + ARCHIVO_CONFIG);
+            throw new IOException("Faltan propiedades de conexion en " + ARCHIVO_CONFIG);
         }
     }
 
-    // ---------- API pública ----------
-
-    /**
-     * Entrega una conexión del pool. Quien la pida debe cerrarla (try-with-resources):
-     *
-     * try (Connection conn = ConexionOracle.getConexion()) { ... }
-     */
     public static Connection getConexion() throws SQLException {
         return envolver(tomar());
     }
 
-    /** Utilidad rápida para verificar que la conexión funciona. */
     public static boolean probarConexion() {
         try (Connection conn = getConexion()) {
             return conn != null && !conn.isClosed();
@@ -90,7 +75,6 @@ public class ConexionOracle {
         }
     }
 
-    /** Cierra de verdad las conexiones libres del pool. Llamar al cerrar la aplicación. */
     public static void cerrarTodas() {
         synchronized (LOCK) {
             while (!libres.isEmpty()) {
@@ -100,13 +84,10 @@ public class ConexionOracle {
         }
     }
 
-    // ---------- Pool ----------
-
     private static Connection tomar() throws SQLException {
         synchronized (LOCK) {
             long limite = System.currentTimeMillis() + ESPERA_MAXIMA_MS;
             while (true) {
-                // 1) Reutilizar una conexión libre
                 while (!libres.isEmpty()) {
                     Connection c = libres.removeFirst();
                     if (!c.isClosed()) {
@@ -114,7 +95,6 @@ public class ConexionOracle {
                     }
                     creadas--;
                 }
-                // 2) Crear una nueva si no se llegó al máximo
                 if (creadas < MAXIMO_CONEXIONES) {
                     creadas++;
                     try {
@@ -124,7 +104,6 @@ public class ConexionOracle {
                         throw e;
                     }
                 }
-                // 3) Esperar a que alguien devuelva una
                 long restante = limite - System.currentTimeMillis();
                 if (restante <= 0) {
                     throw new SQLException("No hay conexiones disponibles (todas estan en uso).");
@@ -144,13 +123,13 @@ public class ConexionOracle {
         try {
             if (!fisica.isClosed()) {
                 if (!fisica.getAutoCommit()) {
-                    fisica.rollback();            // descarta lo que no se confirmó
-                    fisica.setAutoCommit(true);   // la próxima persona la recibe limpia
+                    fisica.rollback();          
+                    fisica.setAutoCommit(true);   
                 }
                 reutilizable = true;
             }
         } catch (SQLException e) {
-            reutilizable = false;                 // si algo falla, se descarta
+            reutilizable = false;              
         }
         synchronized (LOCK) {
             if (reutilizable) {
@@ -167,11 +146,10 @@ public class ConexionOracle {
         try {
             c.close();
         } catch (SQLException e) {
-            // se ignora
+            // Ignorar
         }
     }
 
-    /** Envuelve la conexión física para que close() la devuelva al pool. */
     private static Connection envolver(final Connection fisica) {
         InvocationHandler manejador = new InvocationHandler() {
             private boolean devuelta = false;

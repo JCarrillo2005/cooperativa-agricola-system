@@ -35,6 +35,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import javax.swing.table.DefaultTableModel;
 
 /**
@@ -102,6 +104,14 @@ public class PanelAlbaranes extends JPanel {
         pnlDatosTalonario.add(new JLabel("Socio Agricultor:"), gbc);
         gbc.gridx = 1;
         cmbSocio = new JComboBox<Persona>();
+        cmbSocio.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                actualizarComboSocios();
+            }
+            @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+            @Override public void popupMenuCanceled(PopupMenuEvent e) {}
+        });
         pnlDatosTalonario.add(cmbSocio, gbc);
 
         gbc.gridx = 0; gbc.gridy = 1;
@@ -124,7 +134,16 @@ public class PanelAlbaranes extends JPanel {
 
         JPanel pnlEntradaLinea = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
         cmbProducto = new JComboBox<Producto>();
+        cmbProducto.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                actualizarComboProductos();
+            }
+            @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+            @Override public void popupMenuCanceled(PopupMenuEvent e) {}
+        });
         cmbProducto.addActionListener(e -> sugerirPrecioProducto());
+        
         txtCantidadAceptada = new JTextField("0.00", 5);
         txtCantidadRechazada = new JTextField("0.00", 5);
         txtPrecioUnitario = new JTextField("0.00", 5);
@@ -223,20 +242,49 @@ public class PanelAlbaranes extends JPanel {
 
     private void cargarCombos() {
         try {
-            List<Persona> socios = personaController.listarSocios();
-            cmbSocio.setModel(new DefaultComboBoxModel<Persona>(socios.toArray(new Persona[0])));
+            actualizarComboSocios();
 
             List<Sede> sedes = catalogosController.listarSedes();
             cmbSede.setModel(new DefaultComboBoxModel<Sede>(sedes.toArray(new Sede[0])));
 
-            List<Producto> productos = productoController.listarTodos();
-            cmbProducto.setModel(new DefaultComboBoxModel<Producto>(productos.toArray(new Producto[0])));
-
-            sugerirPrecioProducto();
+            actualizarComboProductos();
         } catch (NegocioException ex) {
             JOptionPane.showMessageDialog(this, "Error cargando datos: " + ex.getMessage(),
                 "Error", JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private void actualizarComboSocios() {
+        try {
+            Persona seleccionado = (Persona) cmbSocio.getSelectedItem();
+            List<Persona> socios = personaController.listarSocios();
+            cmbSocio.setModel(new DefaultComboBoxModel<Persona>(socios.toArray(new Persona[0])));
+            if (seleccionado != null) {
+                for (int i = 0; i < cmbSocio.getItemCount(); i++) {
+                    if (cmbSocio.getItemAt(i).getId() == seleccionado.getId()) {
+                        cmbSocio.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+        } catch (NegocioException ignored) {}
+    }
+
+    private void actualizarComboProductos() {
+        try {
+            Producto seleccionado = (Producto) cmbProducto.getSelectedItem();
+            List<Producto> productos = productoController.listarTodos();
+            cmbProducto.setModel(new DefaultComboBoxModel<Producto>(productos.toArray(new Producto[0])));
+            if (seleccionado != null) {
+                for (int i = 0; i < cmbProducto.getItemCount(); i++) {
+                    if (cmbProducto.getItemAt(i).getId() == seleccionado.getId()) {
+                        cmbProducto.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+            sugerirPrecioProducto();
+        } catch (NegocioException ignored) {}
     }
 
     private void sugerirPrecioProducto() {

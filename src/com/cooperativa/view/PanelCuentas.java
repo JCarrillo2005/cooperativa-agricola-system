@@ -32,6 +32,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import javax.swing.table.DefaultTableModel;
 
 /**
@@ -96,6 +98,17 @@ public class PanelCuentas extends JPanel {
         pnlApertura.add(new JLabel("Titular Principal:"), gbc);
         gbc.gridx = 3;
         cmbTitularPrincipal = new JComboBox<Persona>();
+        
+        // CORRECCIÓN: Actualizar dinámicamente al abrir el menú desplegable
+        cmbTitularPrincipal.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                actualizarComboPersonas();
+            }
+            @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+            @Override public void popupMenuCanceled(PopupMenuEvent e) {}
+        });
+
         pnlApertura.add(cmbTitularPrincipal, gbc);
 
         // Fila 1: Tipo de Cuenta y Sede
@@ -192,11 +205,28 @@ public class PanelCuentas extends JPanel {
             List<Sede> sedes = catalogosController.listarSedes();
             cmbSede.setModel(new DefaultComboBoxModel<Sede>(sedes.toArray(new Sede[0])));
 
-            List<Persona> personas = personaController.listarTodas();
-            cmbTitularPrincipal.setModel(new DefaultComboBoxModel<Persona>(personas.toArray(new Persona[0])));
+            actualizarComboPersonas();
         } catch (NegocioException ex) {
             JOptionPane.showMessageDialog(this, "Error cargando catálogos: " + ex.getMessage(),
                 "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void actualizarComboPersonas() {
+        try {
+            Persona seleccionado = (Persona) cmbTitularPrincipal.getSelectedItem();
+            List<Persona> personas = personaController.listarTodas();
+            cmbTitularPrincipal.setModel(new DefaultComboBoxModel<Persona>(personas.toArray(new Persona[0])));
+            if (seleccionado != null) {
+                for (int i = 0; i < cmbTitularPrincipal.getItemCount(); i++) {
+                    if (cmbTitularPrincipal.getItemAt(i).getId() == seleccionado.getId()) {
+                        cmbTitularPrincipal.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+        } catch (NegocioException ex) {
+            // Manejo silencioso o log
         }
     }
 
@@ -275,7 +305,7 @@ public class PanelCuentas extends JPanel {
         c.setSedeId(sede.getId());
 
         List<CuentaPersona> personas = new ArrayList<CuentaPersona>();
-        personas.add(new CuentaPersona(0, titular.getId(), true)); // titular principal
+        personas.add(new CuentaPersona(0, titular.getId(), true));
 
         try {
             cuentaController.abrirCuenta(c, personas, saldoInicial);

@@ -19,13 +19,23 @@ public class PrestamoDAO {
 
     public boolean guardar(Prestamo p) throws SQLException {
         try (Connection conn = ConexionOracle.getConexion()) {
-            return guardar(p, conn);
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean resultado = guardar(p, conn);
+                conn.commit();
+                return resultado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
     /**
-     * Guarda solo el encabezado del préstamo (los detalles los guarda
-     * DetallePrestamoDAO). La fecha se toma de SYSDATE.
+     * Guarda solo el encabezado del préstamo (los detalles los guarda DetallePrestamoDAO).
      */
     public boolean guardar(Prestamo p, Connection conn) throws SQLException {
         p.setId(siguienteId(conn));
@@ -50,14 +60,15 @@ public class PrestamoDAO {
     private int siguienteId(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement("SELECT seq_prestamos.NEXTVAL FROM dual");
              ResultSet rs = ps.executeQuery()) {
-            rs.next();
-            return rs.getInt(1);
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+            throw new SQLException("No se pudo obtener el siguiente ID de la secuencia seq_prestamos.");
         }
     }
 
     // ---------- READ ----------
 
-    /** Solo el encabezado (sin la lista de detalles). */
     public Prestamo obtenerPorId(int id) throws SQLException {
         String sql = "SELECT " + COLUMNAS + " FROM prestamos WHERE id = ?";
         try (Connection conn = ConexionOracle.getConexion();
@@ -72,7 +83,6 @@ public class PrestamoDAO {
         return null;
     }
 
-    /** Encabezado + productos entregados (para préstamos de consumo). */
     public Prestamo obtenerPorIdConDetalles(int id) throws SQLException {
         Prestamo p = obtenerPorId(id);
         if (p != null) {
@@ -115,29 +125,54 @@ public class PrestamoDAO {
     public boolean actualizar(Prestamo p) throws SQLException {
         String sql = "UPDATE prestamos SET monto = ?, tasa_interes = ?, "
                    + "fecha_vencimiento = ?, estatus_id = ? WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setBigDecimal(1, p.getMonto());
-            ps.setBigDecimal(2, p.getTasaInteres());
-            if (p.getFechaVencimiento() == null) {
-                ps.setNull(3, Types.DATE);
-            } else {
-                ps.setDate(3, new java.sql.Date(p.getFechaVencimiento().getTime()));
+        try (Connection conn = ConexionOracle.getConexion()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean actualizado;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setBigDecimal(1, p.getMonto());
+                    ps.setBigDecimal(2, p.getTasaInteres());
+                    if (p.getFechaVencimiento() == null) {
+                        ps.setNull(3, Types.DATE);
+                    } else {
+                        ps.setDate(3, new java.sql.Date(p.getFechaVencimiento().getTime()));
+                    }
+                    ps.setInt(4, p.getEstatusId());
+                    ps.setInt(5, p.getId());
+                    actualizado = ps.executeUpdate() == 1;
+                }
+                conn.commit();
+                return actualizado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
             }
-            ps.setInt(4, p.getEstatusId());
-            ps.setInt(5, p.getId());
-            return ps.executeUpdate() == 1;
         }
     }
 
-    /** Para marcar un préstamo como pagado, vencido, etc. */
     public boolean cambiarEstatus(int prestamoId, int estatusId) throws SQLException {
         String sql = "UPDATE prestamos SET estatus_id = ? WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, estatusId);
-            ps.setInt(2, prestamoId);
-            return ps.executeUpdate() == 1;
+        try (Connection conn = ConexionOracle.getConexion()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean cambiado;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, estatusId);
+                    ps.setInt(2, prestamoId);
+                    cambiado = ps.executeUpdate() == 1;
+                }
+                conn.commit();
+                return cambiado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 

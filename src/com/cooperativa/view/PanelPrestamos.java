@@ -20,7 +20,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.DefaultComboBoxModel;
@@ -33,6 +32,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import javax.swing.table.DefaultTableModel;
 
 /**
@@ -97,6 +98,14 @@ public class PanelPrestamos extends JPanel {
         pnlGenerales.add(new JLabel("Socio Solicitante:"), gbc);
         gbc.gridx = 1;
         cmbSocio = new JComboBox<Persona>();
+        cmbSocio.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                actualizarComboSocios();
+            }
+            @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+            @Override public void popupMenuCanceled(PopupMenuEvent e) {}
+        });
         pnlGenerales.add(cmbSocio, gbc);
 
         gbc.gridx = 0; gbc.gridy = 1;
@@ -132,6 +141,15 @@ public class PanelPrestamos extends JPanel {
 
         JPanel pnlBarraInsumos = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
         cmbProductoInsumo = new JComboBox<Producto>();
+        cmbProductoInsumo.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                actualizarComboProductosInsumo();
+            }
+            @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+            @Override public void popupMenuCanceled(PopupMenuEvent e) {}
+        });
+
         txtCantidadInsumo = new JTextField("1", 4);
         btnAgregarInsumo = new JButton("Agregar Insumo");
         btnQuitarInsumo = new JButton("Quitar");
@@ -214,17 +232,46 @@ public class PanelPrestamos extends JPanel {
             List<TipoPrestamo> tipos = catalogosController.listarTiposPrestamo();
             cmbTipoPrestamo.setModel(new DefaultComboBoxModel<TipoPrestamo>(tipos.toArray(new TipoPrestamo[0])));
 
-            List<Persona> socios = personaController.listarSocios();
-            cmbSocio.setModel(new DefaultComboBoxModel<Persona>(socios.toArray(new Persona[0])));
-
-            List<Producto> productos = productoController.listarTodos();
-            cmbProductoInsumo.setModel(new DefaultComboBoxModel<Producto>(productos.toArray(new Producto[0])));
+            actualizarComboSocios();
+            actualizarComboProductosInsumo();
 
             alternarTipoPrestamo();
         } catch (NegocioException ex) {
             JOptionPane.showMessageDialog(this, "Error cargando catálogos: " + ex.getMessage(),
                 "Error", JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private void actualizarComboSocios() {
+        try {
+            Persona seleccionado = (Persona) cmbSocio.getSelectedItem();
+            List<Persona> socios = personaController.listarSocios();
+            cmbSocio.setModel(new DefaultComboBoxModel<Persona>(socios.toArray(new Persona[0])));
+            if (seleccionado != null) {
+                for (int i = 0; i < cmbSocio.getItemCount(); i++) {
+                    if (cmbSocio.getItemAt(i).getId() == seleccionado.getId()) {
+                        cmbSocio.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+        } catch (NegocioException ignored) {}
+    }
+
+    private void actualizarComboProductosInsumo() {
+        try {
+            Producto seleccionado = (Producto) cmbProductoInsumo.getSelectedItem();
+            List<Producto> productos = productoController.listarTodos();
+            cmbProductoInsumo.setModel(new DefaultComboBoxModel<Producto>(productos.toArray(new Producto[0])));
+            if (seleccionado != null) {
+                for (int i = 0; i < cmbProductoInsumo.getItemCount(); i++) {
+                    if (cmbProductoInsumo.getItemAt(i).getId() == seleccionado.getId()) {
+                        cmbProductoInsumo.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+        } catch (NegocioException ignored) {}
     }
 
     private void alternarTipoPrestamo() {
@@ -355,7 +402,6 @@ public class PanelPrestamos extends JPanel {
         p.setTipoPrestamoId(tipo.getId());
         p.setTasaInteres(tasa);
 
-        // Calcular fecha futura de vencimiento según plazo
         int meses = 12;
         String plazoStr = (String) cmbPlazoMeses.getSelectedItem();
         if (plazoStr != null && plazoStr.startsWith("6")) meses = 6;

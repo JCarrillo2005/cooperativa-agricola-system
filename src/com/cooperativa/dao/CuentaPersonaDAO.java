@@ -13,11 +13,22 @@ public class CuentaPersonaDAO {
 
     public boolean agregar(CuentaPersona cp) throws SQLException {
         try (Connection conn = ConexionOracle.getConexion()) {
-            return agregar(cp, conn);
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean resultado = agregar(cp, conn);
+                conn.commit();
+                return resultado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
-    /** Para usar dentro de una transacción. */
+    /** Para usar dentro de una transacción externa. */
     public boolean agregar(CuentaPersona cp, Connection conn) throws SQLException {
         String sql = "INSERT INTO cuentas_personas (cuenta_id, persona_id, titular) VALUES (?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -62,22 +73,48 @@ public class CuentaPersonaDAO {
 
     public boolean cambiarTitular(int cuentaId, int personaId, boolean titular) throws SQLException {
         String sql = "UPDATE cuentas_personas SET titular = ? WHERE cuenta_id = ? AND persona_id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, titular ? 1 : 0);
-            ps.setInt(2, cuentaId);
-            ps.setInt(3, personaId);
-            return ps.executeUpdate() == 1;
+        try (Connection conn = ConexionOracle.getConexion()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean cambiado;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, titular ? 1 : 0);
+                    ps.setInt(2, cuentaId);
+                    ps.setInt(3, personaId);
+                    cambiado = ps.executeUpdate() == 1;
+                }
+                conn.commit();
+                return cambiado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
     public boolean quitar(int cuentaId, int personaId) throws SQLException {
         String sql = "DELETE FROM cuentas_personas WHERE cuenta_id = ? AND persona_id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cuentaId);
-            ps.setInt(2, personaId);
-            return ps.executeUpdate() == 1;
+        try (Connection conn = ConexionOracle.getConexion()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean eliminado;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, cuentaId);
+                    ps.setInt(2, personaId);
+                    eliminado = ps.executeUpdate() == 1;
+                }
+                conn.commit();
+                return eliminado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 

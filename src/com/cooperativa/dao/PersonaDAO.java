@@ -17,14 +17,25 @@ public class PersonaDAO {
 
     // ---------- CREATE ----------
 
-    /** Guarda una persona con su propia conexión (hace commit automático). */
+    /** Guarda una persona gestionando su propia transacción y commit. */
     public boolean guardar(Persona p) throws SQLException {
         try (Connection conn = ConexionOracle.getConexion()) {
-            return guardar(p, conn);
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false); // Iniciar transacción explícita
+                boolean resultado = guardar(p, conn);
+                conn.commit();            // Confirmar cambios en Oracle
+                return resultado;
+            } catch (SQLException e) {
+                conn.rollback();          // Revertir si hay error
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
-    /** Versión para usar dentro de una transacción: no abre ni cierra la conexión. */
+    /** Versión para usar dentro de una transacción externa: no abre ni hace commit/rollback local. */
     public boolean guardar(Persona p, Connection conn) throws SQLException {
         p.setId(siguienteId(conn));
 
@@ -48,8 +59,10 @@ public class PersonaDAO {
         String sql = "SELECT seq_personas.NEXTVAL FROM dual";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            rs.next();
-            return rs.getInt(1);
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+            throw new SQLException("No se pudo obtener el siguiente ID de la secuencia.");
         }
     }
 
@@ -96,7 +109,6 @@ public class PersonaDAO {
         return lista;
     }
 
-    /** Todas las personas de un tipo (por ejemplo, solo socios). */
     public List<Persona> obtenerPorTipo(int tipoPersonaId) throws SQLException {
         List<Persona> lista = new ArrayList<Persona>();
         String sql = "SELECT " + COLUMNAS + " FROM personas "
@@ -119,41 +131,78 @@ public class PersonaDAO {
         String sql = "UPDATE personas SET nombre = ?, apellido = ?, dni = ?, "
                    + "direccion = ?, telefono = ?, tipo_persona_id = ?, "
                    + "estatus_id = ?, sede_id = ? WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, p.getNombre());
-            ps.setString(2, p.getApellido());
-            ps.setString(3, p.getDni());
-            ps.setString(4, p.getDireccion());
-            ps.setString(5, p.getTelefono());
-            ps.setInt(6, p.getTipoPersonaId());
-            ps.setInt(7, p.getEstatusId());
-            ps.setInt(8, p.getSedeId());
-            ps.setInt(9, p.getId());
-            return ps.executeUpdate() == 1;
+        try (Connection conn = ConexionOracle.getConexion()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean actualizado;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, p.getNombre());
+                    ps.setString(2, p.getApellido());
+                    ps.setString(3, p.getDni());
+                    ps.setString(4, p.getDireccion());
+                    ps.setString(5, p.getTelefono());
+                    ps.setInt(6, p.getTipoPersonaId());
+                    ps.setInt(7, p.getEstatusId());
+                    ps.setInt(8, p.getSedeId());
+                    ps.setInt(9, p.getId());
+                    actualizado = ps.executeUpdate() == 1;
+                }
+                conn.commit();
+                return actualizado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
-    /** Activar / inactivar sin borrar el registro. */
     public boolean cambiarEstatus(int personaId, int estatusId) throws SQLException {
         String sql = "UPDATE personas SET estatus_id = ? WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, estatusId);
-            ps.setInt(2, personaId);
-            return ps.executeUpdate() == 1;
+        try (Connection conn = ConexionOracle.getConexion()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean cambiado;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, estatusId);
+                    ps.setInt(2, personaId);
+                    cambiado = ps.executeUpdate() == 1;
+                }
+                conn.commit();
+                return cambiado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
     // ---------- DELETE ----------
 
-    /** Borrado físico. Falla si la persona ya tiene cuentas, préstamos o albaranes. */
     public boolean eliminar(int id) throws SQLException {
         String sql = "DELETE FROM personas WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            return ps.executeUpdate() == 1;
+        try (Connection conn = ConexionOracle.getConexion()) {
+            boolean autoCommitOriginal = conn.getAutoCommit();
+            try {
+                conn.setAutoCommit(false);
+                boolean eliminado;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, id);
+                    eliminado = ps.executeUpdate() == 1;
+                }
+                conn.commit();
+                return eliminado;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(autoCommitOriginal);
+            }
         }
     }
 
