@@ -4,6 +4,7 @@ nbproject/private/
 *.class
 config.properties
 backups/
+.archify/
 *.dmp
 *.dump
 *.log
